@@ -2,6 +2,10 @@
 #include "../lib/altdiff.h"
 
 void print_diff(const Diff &diff) {
+  print_left();
+  move_cursor_half_screen();
+  print("|")
+  print_right()
 }
 
 void print_json_diff(const JSON &diff) {
