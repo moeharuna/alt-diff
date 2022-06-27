@@ -4,84 +4,98 @@
 #include <map>
 #include "../include/json.hpp"
 
+namespace AltDiff {
+  using Arch = std::string;
 
-using Arch = std::string;
+  class Version{
+  public:
+    Version();
+    Version(const std::string&);
+    Version(const Version&);
+    Version& operator=(const Version&);
+    const std::string &version_string() const;
+    std::string &version_string();
+    bool operator>(const Version&) const;
+    bool operator<(const Version&) const;
+    bool operator!=(const Version&) const;
+    bool operator==(const Version&) const;
 
-class Version{
-public:
-  Version(const std::string&);
-  const std::string &version_string() const;
-  bool operator>(const Version&) const;
-  bool operator<(const Version&) const;
-  friend bool operator!=(const Version&, const Version&);
-  friend bool operator==(const Version&, const Version&);
+    friend void to_json(nlohmann::json& j, const Version& v);
+    friend void from_json(const nlohmann::json& j, Version& v);
 
-private:
-  struct Impl;
-  std::unique_ptr<Impl> pImpl;
-};
+  private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+  };
 
 
 
-class Package{
-public:
-  const std::string &name() const;
-  const Version &version() const;
-  const Arch &arch() const;
+  class Package{
+  public:
+    Package(const Package&);
+    Package();
+    Package& operator=(const Package&);
+    const std::string &name() const;
+    const Version &version() const;
+    const Arch &arch() const;
 
-private:
-  struct Impl;
-  std::unique_ptr<Impl> pImpl;
-};
+    friend void to_json(nlohmann::json& j, const Package& p);
+    friend void from_json(const nlohmann::json& j, Package& p);
+  private:
 
-class VersionMissmatch {
-public:
-  VersionMissmatch(const Package& p1, const Package &p2);
-  const Version& first() const;
-  const Version& second() const;
-  const std::string& name() const;
-  const Arch& arch() const;
-private:
-  struct Impl;
-  std::unique_ptr<Impl> pImpl;
-};
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+  };
 
-class Diff{
+  class VersionMissmatch {
   public:
 
-  Diff(const std::vector<Package>& first,
-       const std::vector<Package>& second);
-  const std::vector<Package> first_only() const;
-  const std::vector<Package> second_only() const;
-  const std::vector<VersionMissmatch> version_diff() const;
+    VersionMissmatch(const Package& left, const Package &right);
+    VersionMissmatch();
+    VersionMissmatch(const VersionMissmatch&);
+    VersionMissmatch& operator=(const VersionMissmatch&);
+    const Version& left() const;
+    const Version& right() const;
+    const std::string& name() const;
+    const Arch& arch() const;
+
+    friend void from_json(const nlohmann::json& j, VersionMissmatch& vm);
+    friend void to_json(nlohmann::json& j, const VersionMissmatch& vm);
+
   private:
-  struct Impl;
-  std::unique_ptr<Impl> pImpl;
-};
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+  };
 
-using DiffByArch = std::map<Arch, Diff>;
+  class Diff{
+  public:
+    Diff();
+    Diff(const std::vector<Package>& left,
+         const std::vector<Package>& right);
+    //I need implement explicit copy constructor, and copy assigment
+    //for every class because i use unique_ptr for pImpl;
+    Diff(const Diff&);
+    Diff& operator=(const Diff&);
 
-void from_json(const nlohmann::json&, Version& v);
-void to_json(nlohmann::json&, const Version& v);
+    const std::vector<Package>& left_only() const;
+    const std::vector<Package>& right_only() const;
+    const std::vector<VersionMissmatch>& version_diff() const;
 
-void from_json(const nlohmann::json&, Package& p);
-void to_json(nlohmann::json&, const Package& p);
-
-void from_json(const nlohmann::json&, Diff& d);
-void to_json(nlohmann::json&, const Diff& d);
-
-void from_json(const nlohmann::json&, DiffByArch& ad);
-void to_json(const nlohmann::json&, DiffByArch& ad);
-
-nlohmann::json get_diff(const std::string& branch1, const std::string& branch2,
-                        const std::string &arch="",
-                        const std::string &endpoint="https://rdb.altlinux.org/api/"); //returns diffrence between two branches in json format
-std::string get_string_diff(const std::string& branch1, const std::string& branch2,
-                            const std::string &arch="",
-                            const std::string &endpoint="https://rdb.altlinux.org/api/"); //Returns same json as get_diff but in string.
+    friend void from_json(const nlohmann::json& j, Diff& diff);
+    friend void to_json(nlohmann::json& j, const Diff& diff);
+  private:
+    //I use pimpl to hide implimentation of all my classes.
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+  };
 
 
-
-
+  //Returns diffrence between two branches in json format
+  nlohmann::json get_diff(const std::string& branch1, const std::string& branch2,
+                          const std::string &arch="",
+                          const std::string &endpoint="https://rdb.altlinux.org/api/export/branch_binary_packages/");
+  //You can also parse json using nlogman::json.get instead
+  std::map<Arch, Diff> parse_json(nlohmann::json&);
+}
 
 #endif // ALTDIFF_H_

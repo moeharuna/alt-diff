@@ -7,259 +7,331 @@
 #include <future>
 #include "../include/json.hpp"
 #include <algorithm>
+#include <memory>
 using namespace nlohmann;
 
-struct Version {
-  public:
-  std::string &version_string() {
-    return version_string_;
+namespace AltDiff {
+  struct Version::Impl {
+    std::string version_string_;
+  };
+
+  Version::Version() {
+    pImpl = std::make_unique<Impl>();
+  }
+  Version::Version(const std::string& ver_str) {
+    pImpl = std::make_unique<Impl>();
+    pImpl->version_string_ = ver_str;
   }
 
-  const std::string &version_string() const{
-    return version_string_;
+  Version::Version(const Version &old) {
+    pImpl = std::make_unique<Impl>(*old.pImpl);
   }
 
-  friend bool operator!=(const Version &a, const Version &b) {
-    return a.version_string()!=b.version_string();
+
+  Version& Version::operator=(const Version& other) {
+    pImpl = std::make_unique<Impl>(*other.pImpl);
+    return *this;
   }
 
-  bool operator>(const Version &b) const {
+  const std::string& Version::version_string() const{
+    return pImpl->version_string_;
+  }
+
+  bool Version::operator>(const Version &b) const {
     return version_string()>b.version_string();
   }
-  private:
-  std::string version_string_;
 
-};
-
-void from_json(const json &j, Version& v) {
-  j.get_to(v.version_string());
-}
-void to_json(json &j, const Version&v) {
-  j = json(v.version_string());
-}
-using Arch = std::string;
-struct Package {
-  public:
-  std::string &name() {
-    return name_;
+  bool Version::operator<(const Version &b) const {
+    return version_string()<b.version_string();
   }
 
-  const std::string &name() const {
-    return name_;
-  }
-  Version &version() {
-    return version_;
+  bool Version::operator!=(const Version &other) const{
+    return version_string()!=other.version_string();
   }
 
-  const Version &version() const {
-    return version_;
+  bool Version::operator==(const Version& b) const{
+    return !(*this!=b);
   }
 
-  Arch &arch() {
-    return arch_;
+  void to_json(nlohmann::json& j, const Version &v) {
+    j = v.pImpl->version_string_;
   }
 
-  const Arch &arch() const {
-    return arch_;
+  void from_json(const nlohmann::json&j, Version &v) {
+    j.get_to(v.pImpl->version_string_);
   }
 
-  private:
-  std::string name_;
-  Version version_;
-  Arch arch_;
-};
-using Packages = std::vector<Package>;
+  struct Package::Impl {
+    std::string name_;
+    Version version_;
+    Arch arch_;
+  };
 
-void from_json(const json& j, Package& p) {
-  j.at("name").get_to(p.name());
-  j.at("arch").get_to(p.arch());
-  j.at("version").get_to(p.version());
-}
-
-void to_json(json& j, const Package& p) {
-  j = json{{"name", p.name()},
-           {"arch", p.arch()},
-           {"version", p.version()}};
-}
-
-class VersionDiff {
-  public:
-  VersionDiff(const Package& first, const Package& second) {
-    assert(first.name()==second.name());
-    assert(first.arch()==second.arch());
-
-    package_ = first;
-    second_ver_ = second.version();
+  Package::Package() {
+    pImpl = std::make_unique<Impl>();
   }
-  const Version &first_ver() const{
-    return package_.version();
+  Package::Package(const Package& p) {
+    this->pImpl = std::make_unique<Impl>(*p.pImpl);
   }
 
-  Version &first_ver() {
-    return package_.version();
+  Package& Package::operator=(const Package& p) {
+    this->pImpl = std::make_unique<Impl>(*p.pImpl);
+    return *this;
   }
 
-  const Version &second_ver() const{
-    return second_ver_;
+  const std::string& Package::name() const {
+    return pImpl->name_;
   }
 
-  Version &second_ver() {
-    return second_ver_;
+  const Version& Package::version() const {
+    return pImpl->version_;
   }
 
-  const std::string& name() const {
-    return package_.name();
+  const Arch& Package::arch() const {
+    return pImpl->arch_;
   }
 
-  std::string& name() {
-    return package_.name();
+  void to_json(json &j, const Package &p) {
+    j= {{"name", p.pImpl->name_},
+         {"arch", p.pImpl->arch_},
+         {"version", p.pImpl->version_}};
   }
 
-  bool is_first_larger() const{
-    return package_.version()>second_ver();
+  void from_json(const json &j, Package &p) {
+    p.pImpl->name_= j.at("name").get<std::string>();
+    p.pImpl->arch_ = j.at("arch").get<Arch>();
+    p.pImpl->version_ = j.at("version");
   }
 
-  private:
-  Package package_;
-  Version second_ver_;
-};
+  using Packages = std::vector<Package>;
 
-std::vector<VersionDiff> version_set_diffrence(const Packages &first, const Packages &second) {
-  std::vector<VersionDiff> result{};
-  auto first_iter = first.begin();
-  auto second_iter = second.begin();
 
-  while(first_iter!=first.end()) {
-    bool ver_check =
-      second_iter->name()    == first_iter->name() &&
-      second_iter->arch()    == first_iter->arch() &&
-      second_iter->version() != first_iter->version();
-    if(ver_check) {
-      result.emplace_back(VersionDiff{*first_iter, *second_iter});
-    } else {
-      if(second_iter->name() >= first_iter->name()) {
-        ++first_iter;
+
+  struct VersionMissmatch::Impl {
+    std::string name_;
+    Arch arch_;
+    Version left_ver_;
+    Version right_ver_;
+  };
+
+  VersionMissmatch::VersionMissmatch(const Package& left, const Package& right) {
+    assert(left.name()==right.name());
+    assert(left.arch()==right.arch());
+
+    pImpl = std::make_unique<Impl>();
+
+    pImpl->name_ = left.name();
+    pImpl->arch_ = left.arch();
+    pImpl->left_ver_ = left.version();
+    pImpl->right_ver_ = right.version();
+  }
+
+  VersionMissmatch::VersionMissmatch() {
+    pImpl = std::make_unique<Impl>();
+  }
+
+  VersionMissmatch::VersionMissmatch(const VersionMissmatch& other) {
+    pImpl = std::make_unique<Impl>(*other.pImpl);
+  }
+
+  VersionMissmatch& VersionMissmatch::operator=(const VersionMissmatch& other) {
+    pImpl = std::make_unique<Impl>(*other.pImpl);
+    return *this;
+  }
+
+  const Version& VersionMissmatch::left() const{
+    return pImpl->left_ver_;
+  }
+
+  const Version& VersionMissmatch::right() const{
+    return pImpl->right_ver_;
+  }
+
+  const std::string& VersionMissmatch::name() const {
+    return pImpl->name_;
+  }
+
+  const std::string& VersionMissmatch::arch() const {
+    return pImpl->arch_;
+  }
+
+  void from_json(const json &j, VersionMissmatch &vm) {
+    vm.pImpl->name_ = j.at("name").get<std::string>();
+    vm.pImpl->arch_ = j.at("arch").get<Arch>();
+    vm.pImpl->left_ver_ = j.at("left").get<Version>();
+    vm.pImpl->right_ver_ = j.at("right").get<Version>();
+  }
+
+  void to_json(json &j, const VersionMissmatch &vm) {
+    j = {{"name",  vm.pImpl->name_},
+         {"arch",  vm.pImpl->arch_},
+         {"left",  vm.pImpl->left_ver_},
+         {"right", vm.pImpl->right_ver_}};
+  }
+
+  std::vector<VersionMissmatch> version_set_diffrence(const Packages &left, const Packages &right) {
+    std::vector<VersionMissmatch> result{};
+    auto first_iter = left.begin();
+    auto second_iter = right.begin();
+
+    while(first_iter!=left.end()) {
+      bool ver_check =
+        second_iter->name()    == first_iter->name() &&
+        second_iter->arch()    == first_iter->arch() &&
+        second_iter->version() != first_iter->version();
+      if(ver_check) {
+        result.emplace_back(VersionMissmatch{*first_iter, *second_iter});
+      } else {
+        if(second_iter->name() >= first_iter->name()) {
+          ++first_iter;
+        }
+        ++second_iter;
       }
-      ++second_iter;
     }
-  }
-  return result;
-}
-
-
-
-class Diff{
-  public:
-  Diff(const Packages &first,
-       const Packages &second) {
-
-    assert(std::is_sorted(first.begin(),  first.end(), name_comp));
-    assert(std::is_sorted(second.begin(), second.end(), name_comp));
-
-    std::set_difference(first.begin(), first.end(),
-                        second.begin(), second.end(),
-                        std::back_inserter(only_first_), name_comp);
-    std::set_difference(second.begin(), second.end(),
-                        first.begin(), first.end(),
-                        std::back_inserter(only_second_), name_comp);
-    version_missmatch_ = version_set_diffrence(first, second);
-  }
-  private:
-  static bool name_comp(const Package& first, const Package& second) {
-    return first.name() < second.name();
+    return result;
   }
 
-  Packages only_first_;
-  Packages only_second_;
-  std::vector<VersionDiff> version_missmatch_;
-};
 
-size_t curl_callback(char *data, size_t size, size_t nmemb, void *strptr) {
-  size_t real_size = nmemb*size;
-  std::string *result_str =reinterpret_cast<std::string*>(strptr);
-
-  *result_str+=data;
-  return real_size;
-}
-
-std::string curl_get(const std::string &url) {
-  CURL* curl;
-  curl = curl_easy_init();
-  if(curl==NULL) {
-    throw "TODO: Curl is NULL";
-  }
-  std::string result{};
-  result.reserve(10'000);
-
-  curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-  curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curl_callback);
-  curl_easy_setopt(curl, CURLOPT_WRITEDATA, &result);
-  curl_easy_perform(curl);
-  curl_easy_cleanup(curl);
-
-  return result;
-}
-
-
-Packages get_branch(const std::string &branch_name, const std::string &arch="",
-                    const std::string &endpoint="https://rdb.altlinux.org/api/") {
-  std::string result_request = endpoint+branch_name;
-  if(arch!="") {
-    result_request+="?arch="+arch;
-  }
-  auto json = json::parse(curl_get(result_request));
-  return json.at("packages").get<Packages>();
-}
-
-std::pair<Packages, Packages> get_branch_async(const std::string &branch1,
-                                               const std::string &branch2,
-                                               const std::string &arch = "",
-                                               const std::string &endpoint = "https://rdb.altlinux.org/api/") {
-  auto f1 = std::async(std::launch::async,  get_branch, branch1, arch, endpoint);
-  auto f2 = std::async(std::launch::async,  get_branch, branch1, arch, endpoint);
-  if(f1.valid() && f2.valid()) {
-    return std::make_pair(f1.get(), f2.get());
-  } else {
-    throw "TODO: Future is invalid";
-  }
-
-}
-
-std::map<Arch, Packages> packages_by_arch(const Packages& packages) {
-  std::map<Arch, Packages> result;
-  for(const auto &package : packages) {
-    if(result.count(package.arch())==0)
-      result[package.arch()] = std::vector<Package>(512);
-    else {
-      result[package.arch()].emplace_back(package);
+  struct Diff::Impl {
+    Packages only_left_;
+    Packages only_right_;
+    std::vector<VersionMissmatch> version_missmatch_;
+    static bool name_comp(const Package& first, const Package& second) {
+      return first.name() < second.name();
     }
+  };
+
+  Diff::Diff(const Packages &left,
+             const Packages &right) {
+    pImpl = std::make_unique<Impl>();
+    assert(std::is_sorted(left.begin(),  left.end(), pImpl->name_comp));
+    assert(std::is_sorted(right.begin(), right.end(), pImpl->name_comp));
+
+    std::set_difference(left.begin(), left.end(),
+                        right.begin(), right.end(),
+                        std::back_inserter(pImpl->only_left_), pImpl->name_comp);
+    std::set_difference(right.begin(), right.end(),
+                        left.begin(), left.end(),
+                        std::back_inserter(pImpl->only_right_), pImpl->name_comp);
+    pImpl->version_missmatch_ = version_set_diffrence(left, right);
   }
-  return result;
-}
+
+  Diff::Diff() {
+    pImpl = std::make_unique<Impl>();
+  }
+  Diff::Diff(const Diff& d) {
+    pImpl = std::make_unique<Impl>(*d.pImpl);
+  }
+
+  Diff& Diff::operator=(const Diff& d) {
+    pImpl = std::make_unique<Impl>(*d.pImpl);
+    return *this;
+  }
+
+  void from_json(const json& j, Diff& diff) {
+    diff.pImpl->only_left_ = j.at("left").get<Packages>();
+    diff.pImpl->only_right_ = j.at("right").get<Packages>();
+    diff.pImpl->version_missmatch_ = j.at("version").get<std::vector<VersionMissmatch>>();
+  }
+
+  void to_json(json& j, const Diff& diff) {
+    j= {{"left", diff.pImpl->only_left_},
+        {"right", diff.pImpl->only_right_},
+        {"version", diff.pImpl->version_missmatch_}};
+  }
 
 
-bool package_name_comp(const Package& first, const Package& second) {
-  return first.name()<second.name();
-}
+  size_t curl_callback(char *data, size_t size, size_t nmemb, void *strptr) {
+    size_t real_size = nmemb*size;
+    std::string *result_str =reinterpret_cast<std::string*>(strptr);
 
-std::map<Arch, Diff> diff_by_arch(const std::map<Arch, Packages>& pack1,
-                                  const std::map<Arch, Packages>& pack2) {
+    *result_str+=data;
+    return real_size;
+  }
 
-}
+  std::string curl_get(const std::string &url) {
+    CURL* curl;
+    curl = curl_easy_init();
+    if(curl==NULL) {
+      throw "TODO: Curl is NULL";
+    }
+    std::string result{};
+    result.reserve(10'000);
 
-std::map<Arch, Diff> fromJson(JSON diff) {
+    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curl_callback);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &result);
+    curl_easy_perform(curl);
+    curl_easy_cleanup(curl);
 
-}
+    return result;
+  }
 
 
-JSON json_diff(const std::map<Arch, Packages>& pack1,
-               const std::map<Arch, Packages>& pack2) {
-  return toJson(diff_by_arch(pack1, pack2));
-}
+  Packages get_branch(const std::string &branch_name, const std::string &arch="",
+                      const std::string &endpoint="https://rdb.altlinux.org/api//export/branch_binary_packages/") {
+    std::string result_request = endpoint+branch_name;
+    if(arch!="") {
+      result_request+="?arch="+arch;
+    }
+    auto json = json::parse(curl_get(result_request));
+    return json.at("packages").get<Packages>();
+  }
 
-JSON json_diff(const std::string& branch_name1,
-               const std::string& branch_name2) {
-  auto pack1 = packages_by_arch(get_branch(branch_name1));
-  auto pack2 = packages_by_arch(get_branch(branch_name2));
-  return json_diff(pack1, pack2);
+  std::pair<Packages, Packages> get_branch_async(const std::string &branch1,
+                                                 const std::string &branch2,
+                                                 const std::string &arch = "",
+                                                 const std::string &endpoint = "https://rdb.altlinux.org/api//export/branch_binary_packages/") {
+    auto f1 = std::async(std::launch::async,  get_branch, branch1, arch, endpoint);
+    auto f2 = std::async(std::launch::async,  get_branch, branch1, arch, endpoint);
+    if(f1.valid() && f2.valid()) {
+      return std::make_pair(f1.get(), f2.get());
+    } else {
+      throw "TODO: Future is invalid";
+    }
+
+  }
+
+  std::map<Arch, Packages> packages_by_arch(const Packages& packages) {
+    std::map<Arch, Packages> result;
+    for(const auto &package : packages) {
+      if(result.count(package.arch())==0)
+        result[package.arch()] = std::vector<Package>(512);
+      else {
+        result[package.arch()].emplace_back(package);
+      }
+    }
+    return result;
+  }
+
+
+  bool package_name_comp(const Package& first, const Package& second) {
+    return first.name()<second.name();
+  }
+
+  std::map<Arch, Diff> diff_by_arch(const std::map<Arch, Packages>& pack1,
+                       const std::map<Arch, Packages>& pack2) {
+    std::map<Arch, Diff> result;
+    for(const auto& [key, _] : pack1) {
+      result.at(key) = Diff(pack1.at(key), pack2.at(key));
+    }
+    return result;
+  }
+
+  json json_diff(const std::map<Arch, Packages>& pack1,
+                 const std::map<Arch, Packages>& pack2) {
+    json result{diff_by_arch(pack1, pack2)};
+    return result;
+  }
+
+  json json_diff(const std::string& branch_name1,
+                 const std::string& branch_name2) {
+    auto pack1 = packages_by_arch(get_branch(branch_name1));
+    auto pack2 = packages_by_arch(get_branch(branch_name2));
+    return json_diff(pack1, pack2);
+  }
+
+  std::map<Arch, Diff> parse_json(nlohmann::json& j) {
+    return j.get<std::map<Arch, Diff>>();
+  }
 }
