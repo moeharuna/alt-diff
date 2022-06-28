@@ -8,6 +8,9 @@
 #include "../include/json.hpp"
 #include <algorithm>
 #include <memory>
+#ifdef ALTDIFF_DEBUG
+#include <iostream>
+#endif
 using namespace nlohmann;
 
 namespace AltDiff {
@@ -26,6 +29,7 @@ namespace AltDiff {
   Version::Version(const Version &old) {
     pImpl = std::make_unique<Impl>(*old.pImpl);
   }
+  Version::~Version() = default;
 
 
   Version& Version::operator=(const Version& other) {
@@ -73,6 +77,7 @@ namespace AltDiff {
   Package::Package(const Package& p) {
     this->pImpl = std::make_unique<Impl>(*p.pImpl);
   }
+  Package::~Package() =  default;
 
   Package& Package::operator=(const Package& p) {
     this->pImpl = std::make_unique<Impl>(*p.pImpl);
@@ -100,7 +105,7 @@ namespace AltDiff {
   void from_json(const json &j, Package &p) {
     p.pImpl->name_= j.at("name").get<std::string>();
     p.pImpl->arch_ = j.at("arch").get<Arch>();
-    p.pImpl->version_ = j.at("version");
+    p.pImpl->version_ = j.at("version").get<Version>();
   }
 
   using Packages = std::vector<Package>;
@@ -133,6 +138,7 @@ namespace AltDiff {
   VersionMissmatch::VersionMissmatch(const VersionMissmatch& other) {
     pImpl = std::make_unique<Impl>(*other.pImpl);
   }
+  VersionMissmatch::~VersionMissmatch() = default;
 
   VersionMissmatch& VersionMissmatch::operator=(const VersionMissmatch& other) {
     pImpl = std::make_unique<Impl>(*other.pImpl);
@@ -197,23 +203,28 @@ namespace AltDiff {
     Packages only_right_;
     std::vector<VersionMissmatch> version_missmatch_;
     static bool name_comp(const Package& first, const Package& second) {
+#ifdef ALTDIFF_DEBUG
+      std::cerr<<first.name()<<":"<<first.version().version_string()<<" < "
+               <<second.name()<<":"<<second.version().version_string()
+               <<" = "<< (first.name() < second.name())<<"\n";
+#endif
       return first.name() < second.name();
     }
   };
 
-  Diff::Diff(const Packages &left,
-             const Packages &right) {
+  Diff::Diff(const Packages &first,
+             const Packages &second) {
     pImpl = std::make_unique<Impl>();
-    assert(std::is_sorted(left.begin(),  left.end(), pImpl->name_comp));
-    assert(std::is_sorted(right.begin(), right.end(), pImpl->name_comp));
+    assert(std::is_sorted(first.begin(),  first.end(), pImpl->name_comp));
+    assert(std::is_sorted(second.begin(), second.end(), pImpl->name_comp));
 
-    std::set_difference(left.begin(), left.end(),
-                        right.begin(), right.end(),
+    std::set_difference(first.begin(), first.end(),
+                        second.begin(), second.end(),
                         std::back_inserter(pImpl->only_left_), pImpl->name_comp);
-    std::set_difference(right.begin(), right.end(),
-                        left.begin(), left.end(),
+    std::set_difference(second.begin(), second.end(),
+                        first.begin(), first.end(),
                         std::back_inserter(pImpl->only_right_), pImpl->name_comp);
-    pImpl->version_missmatch_ = version_set_diffrence(left, right);
+    pImpl->version_missmatch_ = version_set_diffrence(first, second);
   }
 
   Diff::Diff() {
@@ -223,9 +234,21 @@ namespace AltDiff {
     pImpl = std::make_unique<Impl>(*d.pImpl);
   }
 
+  Diff::~Diff() = default;
+
   Diff& Diff::operator=(const Diff& d) {
     pImpl = std::make_unique<Impl>(*d.pImpl);
     return *this;
+  }
+
+  const std::vector<Package>& Diff::left_only() const {
+    return pImpl->only_left_;
+  }
+  const std::vector<Package>& Diff::right_only() const {
+    return pImpl->only_right_;
+  }
+  const std::vector<VersionMissmatch>& Diff::version_diff() const {
+    return pImpl->version_missmatch_;
   }
 
   void from_json(const json& j, Diff& diff) {
@@ -268,22 +291,27 @@ namespace AltDiff {
   }
 
 
-  Packages get_branch(const std::string &branch_name, const std::string &arch="",
-                      const std::string &endpoint="https://rdb.altlinux.org/api//export/branch_binary_packages/") {
+  Packages get_branch(const std::string &branch_name,
+                      const std::string &arch,
+                      const std::string &endpoint) {
     std::string result_request = endpoint+branch_name;
     if(arch!="") {
       result_request+="?arch="+arch;
     }
-    auto json = json::parse(curl_get(result_request));
+    std::string get= curl_get(result_request);
+    #ifdef ALTDIFF_DEBUG
+    std::cerr<<get;
+    #endif
+    auto json = json::parse(get);
     return json.at("packages").get<Packages>();
   }
 
   std::pair<Packages, Packages> get_branch_async(const std::string &branch1,
                                                  const std::string &branch2,
-                                                 const std::string &arch = "",
-                                                 const std::string &endpoint = "https://rdb.altlinux.org/api//export/branch_binary_packages/") {
+                                                 const std::string &arch,
+                                                 const std::string &endpoint) {
     auto f1 = std::async(std::launch::async,  get_branch, branch1, arch, endpoint);
-    auto f2 = std::async(std::launch::async,  get_branch, branch1, arch, endpoint);
+    auto f2 = std::async(std::launch::async,  get_branch, branch2, arch, endpoint);
     if(f1.valid() && f2.valid()) {
       return std::make_pair(f1.get(), f2.get());
     } else {
@@ -304,34 +332,28 @@ namespace AltDiff {
     return result;
   }
 
-
-  bool package_name_comp(const Package& first, const Package& second) {
-    return first.name()<second.name();
-  }
-
-  std::map<Arch, Diff> diff_by_arch(const std::map<Arch, Packages>& pack1,
-                       const std::map<Arch, Packages>& pack2) {
+  std::map<Arch, Diff> diff_by_arch(const Packages& packages1,
+                                    const Packages& packages2) {
+    auto pack1 = packages_by_arch(packages1);
+    auto pack2 = packages_by_arch(packages2);
     std::map<Arch, Diff> result;
     for(const auto& [key, _] : pack1) {
-      result.at(key) = Diff(pack1.at(key), pack2.at(key));
+      result[key] = Diff(pack1.at(key), pack2.at(key));
     }
     return result;
   }
 
-  json json_diff(const std::map<Arch, Packages>& pack1,
-                 const std::map<Arch, Packages>& pack2) {
-    json result{diff_by_arch(pack1, pack2)};
-    return result;
-  }
 
-  json json_diff(const std::string& branch_name1,
-                 const std::string& branch_name2) {
-    auto pack1 = packages_by_arch(get_branch(branch_name1));
-    auto pack2 = packages_by_arch(get_branch(branch_name2));
-    return json_diff(pack1, pack2);
-  }
 
   std::map<Arch, Diff> parse_json(nlohmann::json& j) {
     return j.get<std::map<Arch, Diff>>();
+  }
+
+  json get_diff(const std::string& branch1, const std::string& branch2,
+                const std::string &arch,
+                const std::string &endpoint) {
+    auto [first, second] = get_branch_async(branch1, branch2, arch, endpoint);
+    auto diffs = diff_by_arch(first, second);
+    return diffs;
   }
 }

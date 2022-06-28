@@ -12,6 +12,7 @@ namespace AltDiff {
     Version();
     Version(const std::string&);
     Version(const Version&);
+    ~Version();
     Version& operator=(const Version&);
     const std::string &version_string() const;
     std::string &version_string();
@@ -34,6 +35,7 @@ namespace AltDiff {
   public:
     Package(const Package&);
     Package();
+    ~Package();
     Package& operator=(const Package&);
     const std::string &name() const;
     const Version &version() const;
@@ -53,6 +55,8 @@ namespace AltDiff {
     VersionMissmatch(const Package& left, const Package &right);
     VersionMissmatch();
     VersionMissmatch(const VersionMissmatch&);
+    ~VersionMissmatch();
+
     VersionMissmatch& operator=(const VersionMissmatch&);
     const Version& left() const;
     const Version& right() const;
@@ -70,12 +74,13 @@ namespace AltDiff {
   class Diff{
   public:
     Diff();
-    Diff(const std::vector<Package>& left,
-         const std::vector<Package>& right);
+    Diff(const std::vector<Package>& first,
+         const std::vector<Package>& second);
     //I need implement explicit copy constructor, and copy assigment
     //for every class because i use unique_ptr for pImpl;
     Diff(const Diff&);
     Diff& operator=(const Diff&);
+    ~Diff();
 
     const std::vector<Package>& left_only() const;
     const std::vector<Package>& right_only() const;
