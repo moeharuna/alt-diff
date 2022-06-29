@@ -16,6 +16,34 @@ using namespace nlohmann;
 namespace AltDiff {
   struct Version::Impl {
     std::string version_string_;
+    std::vector<int> version_vec;
+    std::vector<std::string> str_split(std::string str, std::string delim=" ") {
+      std::vector<std::string> result{};
+      size_t pos = 0;
+      std::string token;
+      while ((pos = str.find(delim)) != std::string::npos) {
+        token = str.substr(0, pos);
+        result.push_back(token);
+        str.erase(0, pos+delim.length());
+#ifdef ALTDIFF_DEBUG
+        //std::cerr<<token<<" "<<pos<<"\n";
+#endif
+      }
+      if(str!="") result.push_back(str);
+      return result;
+    }
+    void parse_version_vec() {
+      std::vector<std::string> str_vec = str_split(version_string_, ".");
+
+      version_vec = {};
+      try {
+        for(const auto &str:str_vec) {
+          version_vec.emplace_back(stoi(str));
+        }
+      } catch(std::invalid_argument) {
+        version_vec = {};
+      }
+    }
   };
 
   Version::Version() {
@@ -24,6 +52,7 @@ namespace AltDiff {
   Version::Version(const std::string& ver_str) {
     pImpl = std::make_unique<Impl>();
     pImpl->version_string_ = ver_str;
+    pImpl->parse_version_vec();
   }
 
   Version::Version(const Version &old) {
@@ -41,12 +70,25 @@ namespace AltDiff {
     return pImpl->version_string_;
   }
 
-  bool Version::operator>(const Version &b) const {
-    return version_string()>b.version_string();
-  }
-
   bool Version::operator<(const Version &b) const {
-    return version_string()<b.version_string();
+    if(pImpl-> version_vec.size() > 0 && b.pImpl->version_vec.size() >0) {
+      for(int i=0; i< pImpl->version_vec.size(); ++i) {
+        if(i > b.pImpl->version_vec.size()) {
+          return false;
+        }
+        if(pImpl->version_vec[i] < b.pImpl->version_vec[i]) {
+          return true;
+        } else if(pImpl->version_vec[i] > b.pImpl->version_vec[i]){
+          return false;
+        }
+      }
+    }
+#ifdef ALTDIFF_DEBUG
+    std::cerr<<"Version parsing: "<<pImpl->version_string_<<" "<<b.pImpl->version_string_<<" Failed\n";
+#endif
+     //Fallback if version parsing is failed
+    return pImpl->version_string_ < b.pImpl->version_string_;
+
   }
 
   bool Version::operator!=(const Version &other) const{
@@ -63,6 +105,7 @@ namespace AltDiff {
 
   void from_json(const nlohmann::json&j, Version &v) {
     j.get_to(v.pImpl->version_string_);
+    v.pImpl->parse_version_vec();
   }
 
   struct Package::Impl {
@@ -175,24 +218,26 @@ namespace AltDiff {
          {"right", vm.pImpl->right_ver_}};
   }
 
-  std::vector<VersionMissmatch> version_set_diffrence(const Packages &left, const Packages &right) {
+  std::vector<VersionMissmatch> version_set_diffrence(const Packages &first, const Packages &second) {
     std::vector<VersionMissmatch> result{};
-    auto first_iter = left.begin();
-    auto second_iter = right.begin();
+    auto first_iter = first.begin();
+    auto second_iter = second.begin();
 
-    while(first_iter!=left.end()) {
+    while(first_iter!=first.end() && second_iter!=second.end()) {
       bool ver_check =
         second_iter->name()    == first_iter->name() &&
         second_iter->arch()    == first_iter->arch() &&
         second_iter->version() != first_iter->version();
-      if(ver_check) {
-        result.emplace_back(VersionMissmatch{*first_iter, *second_iter});
-      } else {
-        if(second_iter->name() >= first_iter->name()) {
-          ++first_iter;
-        }
-        ++second_iter;
-      }
+     if(ver_check) {
+       result.push_back(VersionMissmatch(*first_iter, *second_iter));
+       ++second_iter;
+     }
+     else if(first_iter->name() < second_iter->name()) {
+       ++first_iter;
+     }
+     else {
+       ++second_iter;
+     }
     }
     return result;
   }
@@ -203,11 +248,7 @@ namespace AltDiff {
     Packages only_right_;
     std::vector<VersionMissmatch> version_missmatch_;
     static bool name_comp(const Package& first, const Package& second) {
-#ifdef ALTDIFF_DEBUG
-      std::cerr<<first.name()<<":"<<first.version().version_string()<<" < "
-               <<second.name()<<":"<<second.version().version_string()
-               <<" = "<< (first.name() < second.name())<<"\n";
-#endif
+
       return first.name() < second.name();
     }
   };

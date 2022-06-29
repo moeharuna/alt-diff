@@ -1,16 +1,55 @@
 #include <iostream>
+#include <sys/ioctl.h>
 #include "../lib/altdiff.h"
-
-struct Position {
-  int x, y;
-};
-
-void print_diff(const AltDiff::Diff &diff, int terminal_width) {
-  std::cout<<"\033["<<terminal_width/2<<"C"<<"|\n";
+#include <stdlib.h>
+void print_package(const AltDiff::Package& package) {
+  std::cout<<package.name();
+}
+void print_ver_missmatch(const AltDiff::VersionMissmatch & vm, size_t left_fill=0) {
+  std::cout<<std::left<<std::setw(left_fill);
+  std::cout<<vm.name()+": ";
+  std::cout<<vm.left().version_string()<<" != "<<vm.right().version_string()<<"\n";
 }
 
-Position read_terminal_size() {
+void move_cursor_to_center() {
+  winsize ws;
+  ioctl(fileno(stdout), TIOCGWINSZ, &ws);
+  std::cout<<"\033[999D"; //move left by 999 characters
+  std::cout<<"\033["<<ws.ws_col/2<<"C"; //move right by ws_col/2
+}
 
+void print_diff(const AltDiff::Diff &diff) {
+  size_t max_len = 0;
+  for(const auto& pack: diff.left_only()) {
+    max_len = std::max(pack.name().length(), max_len);
+  }
+
+  int left=0, right=0;
+  while(left< diff.left_only().size() ||
+        right< diff.right_only().size()) {
+    if(left < diff.left_only().size()) {
+      std::cout<<std::left<<std::setw(max_len);
+      print_package(diff.left_only().at(left));
+    } else {
+      std::cout<<std::right<<std::setw(max_len+2);
+    }
+    //move_cursor_to_center();
+    std::cout<<"| ";
+    if(right < diff.right_only().size()) {
+      print_package(diff.right_only().at(right));
+    }
+    std::cout<<"\n";
+    left++;
+    right++;
+  }
+  for(const auto& ver_miss: diff.version_diff()) {
+    max_len = std::max(ver_miss.name().length(), max_len);
+  }
+  for(const auto& ver_miss : diff.version_diff()) {
+    if(ver_miss.left() < ver_miss.right()) {
+      print_ver_missmatch(ver_miss, max_len);
+    }
+  }
 }
 
 int main(int argc, char *argv[]) {
@@ -24,10 +63,8 @@ int main(int argc, char *argv[]) {
 
   std::map<AltDiff::Arch, AltDiff::Diff> diff_map = diff;
   for(const auto& [arch, diff] :diff_map) {
-    for(const auto& package:diff.version_diff()) {
-      std::cout<<package.name()<<" "<<package.left().version_string()
-               <<":"<<package.right().version_string()<<"\n";
-    }
+    std::cout<<"["<<arch<<"] = \n";
+    print_diff(diff);
   }
 
   return 0;
