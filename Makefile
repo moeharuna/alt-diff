@@ -12,4 +12,4 @@ alt-diff: $(LIB) $(FILES)
 debug: $(LIB) $(FILES)
 	$(CC) $(LIB) $(FILES) --std=$(STD) $(CFLAGS) $(DEBUG_FLAGS) $(DYNAMIC) -o alt-diff
 clean:
-	rm *.o alt-diff
+	rm alt-diff

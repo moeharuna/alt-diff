@@ -73,7 +73,7 @@ namespace AltDiff {
   bool Version::operator<(const Version &b) const {
     if(pImpl-> version_vec.size() > 0 && b.pImpl->version_vec.size() >0) {
       for(int i=0; i< pImpl->version_vec.size(); ++i) {
-        if(i > b.pImpl->version_vec.size()) {
+        if(i >= b.pImpl->version_vec.size()) {
           return false;
         }
         if(pImpl->version_vec[i] < b.pImpl->version_vec[i]) {
