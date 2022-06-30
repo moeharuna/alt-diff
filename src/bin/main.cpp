@@ -11,13 +11,6 @@ void print_ver_missmatch(const AltDiff::VersionMissmatch & vm, size_t left_fill=
   std::cout<<vm.left().version_string()<<" != "<<vm.right().version_string()<<"\n";
 }
 
-void move_cursor_to_center() {
-  winsize ws;
-  ioctl(fileno(stdout), TIOCGWINSZ, &ws);
-  std::cout<<"\033[999D"; //move left by 999 characters
-  std::cout<<"\033["<<ws.ws_col/2<<"C"; //move right by ws_col/2
-}
-
 void print_diff(const AltDiff::Diff &diff) {
   size_t max_len = 0;
   for(const auto& pack: diff.left_only()) {
@@ -53,13 +46,17 @@ void print_diff(const AltDiff::Diff &diff) {
 }
 
 int main(int argc, char *argv[]) {
-  if(argc!=3 || strcmp(argv[1], "-h")==0 || strcmp(argv[1], "--help")==0) {
-    std::cout<<"Usage: "<<argv[0]<<" <branch1> <branch2>";
+  if(argc < 3 || argc > 4 || strcmp(argv[1], "-h")==0 || strcmp(argv[1], "--help")==0) {
+    std::cout<<"Usage: "<<argv[0]<<" <branch1> <branch2> <arch>(optional)";
     return 1;
   }
   std::string branch1{argv[1]};
   std::string branch2{argv[2]};
-  auto diff = AltDiff::get_diff(branch1, branch2, "aarch64");
+  std::string arch = "";
+  if(argc==4) {
+    arch = argv[3];
+  }
+  auto diff = AltDiff::get_diff(branch1, branch2, arch);
 
   std::map<AltDiff::Arch, AltDiff::Diff> diff_map = diff;
   for(const auto& [arch, diff] :diff_map) {
