@@ -4,7 +4,7 @@ DYNAMIC = "-lcurl"
 CFLAGS = -Wall
 STD = c++17
 CC = clang++
-DEBUG_FLAGS = -g -DALTDIFF_DEBUG
+DEBUG_FLAGS = -g
 
 
 alt-diff: $(LIB) $(FILES)

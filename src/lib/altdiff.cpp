@@ -8,10 +8,20 @@
 #include "../include/json.hpp"
 #include <algorithm>
 #include <memory>
-#ifdef ALTDIFF_DEBUG
-#include <iostream>
-#endif
 using namespace nlohmann;
+
+
+class WrongBranchNameException : public std::exception {
+  private:
+  char msg_[512] = {0};
+  public:
+  WrongBranchNameException(std::string msg) {
+    strncpy(msg_, msg.c_str(), sizeof(msg_));
+  }
+  const char * what() const noexcept override {
+    return msg_;
+  }
+};
 
 namespace AltDiff {
   struct Version::Impl {
@@ -25,9 +35,6 @@ namespace AltDiff {
         token = str.substr(0, pos);
         result.push_back(token);
         str.erase(0, pos+delim.length());
-#ifdef ALTDIFF_DEBUG
-        //std::cerr<<token<<" "<<pos<<"\n";
-#endif
       }
       if(str!="") result.push_back(str);
       return result;
@@ -83,10 +90,7 @@ namespace AltDiff {
         }
       }
     }
-#ifdef ALTDIFF_DEBUG
-    std::cerr<<"Version parsing: "<<pImpl->version_string_<<" "<<b.pImpl->version_string_<<" Failed\n";
-#endif
-     //Fallback if version parsing is failed
+    //Fallback if version parsing is failed
     return pImpl->version_string_ < b.pImpl->version_string_;
 
   }
@@ -340,10 +344,14 @@ namespace AltDiff {
       result_request+="?arch="+arch;
     }
     std::string get= curl_get(result_request);
-    #ifdef ALTDIFF_DEBUG
-    std::cerr<<get;
-    #endif
     auto json = json::parse(get);
+    if(json.contains("validation_message")) {
+      std::string error_msg = "Error when trying to get branch: ";
+      for(const std::string& str: json.at("validation_message").get<std::vector<std::string>>()) {
+        error_msg+=str+"\n";
+      }
+      throw WrongBranchNameException(error_msg);
+    }
     return json.at("packages").get<Packages>();
   }
 

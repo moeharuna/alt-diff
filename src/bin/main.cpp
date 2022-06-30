@@ -56,12 +56,15 @@ int main(int argc, char *argv[]) {
   if(argc==4) {
     arch = argv[3];
   }
-  auto diff = AltDiff::get_diff(branch1, branch2, arch);
-
-  std::map<AltDiff::Arch, AltDiff::Diff> diff_map = diff;
-  for(const auto& [arch, diff] :diff_map) {
-    std::cout<<"["<<arch<<"] = \n";
-    print_diff(diff);
+  try {
+    auto diff = AltDiff::get_diff(branch1, branch2, arch);
+    std::map<AltDiff::Arch, AltDiff::Diff> diff_map = diff;
+    for(const auto& [arch, diff] :diff_map) {
+      std::cout<<"["<<arch<<"] = \n";
+      print_diff(diff);
+    }
+  } catch(const std::exception& e) {
+    std::cout<<e.what()<<"\n";
   }
 
   return 0;
