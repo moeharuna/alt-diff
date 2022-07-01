@@ -2,7 +2,7 @@
 #define ALTDIFF_H_
 #include <string>
 #include <map>
-#include "../include/json.hpp"
+#include <json.hpp>
 
 namespace AltDiff {
   using Arch = std::string;

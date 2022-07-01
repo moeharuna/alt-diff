@@ -1,15 +1,25 @@
-LIB = src/lib/altdiff.cpp
-FILES = src/bin/main.cpp
-DYNAMIC = "-lcurl"
+LIB = libalt-diff/altdiff.cpp
+INCLUDE = -I include/ -I libalt-diff/
+LINK = "-lcurl"
 CFLAGS = -Wall
+BIN = alt-diff/main.cpp
+
 STD = c++17
-CC = clang++
+CC = g++
 DEBUG_FLAGS = -g
 
+bin: $(FILES)
+	make object
+	$(CC)  $(BIN) altdiff.o --std=$(STD) $(CFLAGS) $(INCLUDE) $(LINK) -o altdiff.out
 
-alt-diff: $(LIB) $(FILES)
-	$(CC) $(LIB) $(FILES) --std=$(STD) $(CFLAGS) $(DYNAMIC) -o alt-diff
+object: $(LIB)
+	$(CC) $(LIB) --std=$(STD) $(CFLAGS) $(INCLUDE) $(LINK) -fPIC -c -o altdiff.o
+
+lib: $(LIB)
+	make object
+	$(CC) altdiff.o  -shared -o altdiff.so
+
 debug: $(LIB) $(FILES)
 	$(CC) $(LIB) $(FILES) --std=$(STD) $(CFLAGS) $(DEBUG_FLAGS) $(DYNAMIC) -o alt-diff
 clean:
-	rm alt-diff
+	rm -f altdiff.out altdiff.o altdiff.so

@@ -5,9 +5,9 @@
 #include <optional>
 #include <curl/curl.h>
 #include <future>
-#include "../include/json.hpp"
 #include <algorithm>
 #include <memory>
+#include <json.hpp>
 using namespace nlohmann;
 
 
@@ -47,7 +47,7 @@ namespace AltDiff {
         for(const auto &str:str_vec) {
           version_vec.emplace_back(stoi(str));
         }
-      } catch(std::invalid_argument) {
+      } catch(const std::invalid_argument&) {
         version_vec = {};
       }
     }
@@ -79,7 +79,7 @@ namespace AltDiff {
 
   bool Version::operator<(const Version &b) const {
     if(pImpl-> version_vec.size() > 0 && b.pImpl->version_vec.size() >0) {
-      for(int i=0; i< pImpl->version_vec.size(); ++i) {
+      for(size_t i=0; i< pImpl->version_vec.size(); ++i) {
         if(i >= b.pImpl->version_vec.size()) {
           return false;
         }

@@ -1,6 +1,6 @@
 #include <iostream>
 #include <sys/ioctl.h>
-#include "../lib/altdiff.h"
+#include "altdiff.h"
 #include <stdlib.h>
 void print_package(const AltDiff::Package& package) {
   std::cout<<package.name();
@@ -8,7 +8,7 @@ void print_package(const AltDiff::Package& package) {
 void print_ver_missmatch(const AltDiff::VersionMissmatch & vm, size_t left_fill=0) {
   std::cout<<std::left<<std::setw(left_fill);
   std::cout<<vm.name()+": ";
-  std::cout<<vm.left().version_string()<<" != "<<vm.right().version_string()<<"\n";
+  std::cout<<vm.left().version_string()<<" < "<<vm.right().version_string()<<"\n";
 }
 
 void print_diff(const AltDiff::Diff &diff) {
@@ -17,7 +17,7 @@ void print_diff(const AltDiff::Diff &diff) {
     max_len = std::max(pack.name().length(), max_len);
   }
 
-  int left=0, right=0;
+  size_t left=0, right=0;
   while(left< diff.left_only().size() ||
         right< diff.right_only().size()) {
     if(left < diff.left_only().size()) {
