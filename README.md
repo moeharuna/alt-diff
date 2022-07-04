@@ -11,7 +11,7 @@ cd alt-diff
 make
 ```
 ## Running
-`./alt-diff <branch1> <branch2> <arch>`
+`./alt-diff.out <branch1> <branch2> <arch>`
 
 Where: 
 - branch1 and branch2 are names of branches you want to compare.
@@ -20,12 +20,21 @@ Where:
 The program will take some time and output will be huge,
 so you probably would want to redirect output into a file like so:
 
-`./alt-diff "p9" "p10" > result.txt`
+`./alt-diff.out "p9" "p10" > result.txt`
 
 or to pipe it into less
 
-`./alt-diff "p9" "p10" | less`
+`./alt-diff.out "p9" "p10" | less`
 
+## Installing
+- Binary
+  1. Build executable using `make` or `make bin`.
+  2. Copy altdiff.out to any directory from your $PATH env variable.
+- Library
+  1. Build library using `make lib`.
+  2. Copy `libalt-diff/altdiff.h` to your include path.
+  3. Copy `libaltdiff.so` to your LD_LIBRARY_PATH.
+  4. Link with `libaltdiff.so` by passing `-laltdiff` flag to your compiler.
 ## Requirements
 - libCurl
 
