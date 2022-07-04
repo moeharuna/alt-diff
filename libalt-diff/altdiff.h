@@ -2,10 +2,14 @@
 #define ALTDIFF_H_
 #include <string>
 #include <map>
+#include <variant>
 #include <json.hpp>
-
+#include <expected.hpp>
+#include <curl/curl.h>
 namespace AltDiff {
   using Arch = std::string;
+
+
 
   class Version{
   public:
@@ -95,10 +99,32 @@ namespace AltDiff {
   };
 
 
+  struct CurlError {
+    public:
+    CurlError(CURLcode code, std::string&& error_desc);
+    CurlError();
+    CURLcode code;
+    std::string error_desc;
+  };
+
+
+  struct HttpError {
+    public:
+    HttpError(long http_response_code,
+              std::string&& response_body,
+              std::string&& content_type);
+    long http_response_code;
+    std::string response_body;
+    std::string content_type;
+  };
+
+  using Error = std::variant<CurlError, HttpError>;
+
   //Returns diffrence between two branches in json format
-  nlohmann::json get_diff(const std::string& branch1, const std::string& branch2,
-                          const std::string &arch="",
-                          const std::string &endpoint="https://rdb.altlinux.org/api/export/branch_binary_packages/");
+  //Its using one of c++23 std::expected implementaions for error handling
+  tl::expected<nlohmann::json, Error> get_diff(const std::string& branch1, const std::string& branch2,
+                                               const std::string &arch="",
+                                               const std::string &endpoint="https://rdb.altlinux.org/api/export/branch_binary_packages/");
   //You can also parse json using nlogman::json.get instead
   std::map<Arch, Diff> parse_json(nlohmann::json&);
 }

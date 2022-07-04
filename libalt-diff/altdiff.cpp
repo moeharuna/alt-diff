@@ -1,29 +1,21 @@
 #include "altdiff.h"
 #include <map>
+#include <optional>
 #include <string>
 #include <vector>
-#include <optional>
 #include <curl/curl.h>
 #include <future>
 #include <algorithm>
 #include <memory>
 #include <json.hpp>
+#include <expected.hpp>
 using namespace nlohmann;
 
 
-class WrongBranchNameException : public std::exception {
-  private:
-  char msg_[512] = {0};
-  public:
-  WrongBranchNameException(std::string msg) {
-    strncpy(msg_, msg.c_str(), sizeof(msg_));
-  }
-  const char * what() const noexcept override {
-    return msg_;
-  }
-};
+
 
 namespace AltDiff {
+
   struct Version::Impl {
     std::string version_string_;
     std::vector<int> version_vec;
@@ -145,8 +137,8 @@ namespace AltDiff {
 
   void to_json(json &j, const Package &p) {
     j= {{"name", p.pImpl->name_},
-         {"arch", p.pImpl->arch_},
-         {"version", p.pImpl->version_}};
+        {"arch", p.pImpl->arch_},
+        {"version", p.pImpl->version_}};
   }
 
   void from_json(const json &j, Package &p) {
@@ -317,56 +309,107 @@ namespace AltDiff {
     return real_size;
   }
 
-  std::string curl_get(const std::string &url) {
+  CurlError::CurlError(CURLcode code, std::string&& error_desc) :code{code}, error_desc{error_desc} {}
+  CurlError::CurlError() {
+    code = CURLE_OK;
+    error_desc = "Error on curl init, error_msg cannot be supplied";
+  }
+  HttpError::HttpError(long http_response_code,
+                       std::string&& body,
+                       std::string&& content_type)
+    :http_response_code{http_response_code},
+     response_body{body},
+     content_type{content_type} {}
+
+  tl::expected<std::string, Error> curl_get(const std::string &url) {
+    char curl_error_buffer[CURL_ERROR_SIZE];
+    long http_response;
     CURL* curl;
+    char *ct = NULL;
+    std::string content_type{};
     curl = curl_easy_init();
     if(curl==NULL) {
-      throw "TODO: Curl is NULL";
+      return tl::unexpected(CurlError{});
     }
-    std::string result{};
-    result.reserve(10'000);
+    std::string response;
+    response.reserve(10'000);
 
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curl_callback);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &result);
-    curl_easy_perform(curl);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
+    curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, curl_error_buffer);
+    curl_error_buffer[0] = 0;
+    CURLcode err_code =  curl_easy_perform(curl);
+
+    if(err_code != CURLE_OK) {
+      std::string error_str{curl_error_buffer};
+      return tl::unexpected(CurlError{err_code, std::move(error_str)});
+    }
+
+    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_response);
+    curl_easy_getinfo(curl, CURLINFO_CONTENT_TYPE, &ct);
+    if(ct != NULL)
+      content_type = ct;
+    if(http_response!=200) {
+      return tl::unexpected(HttpError{http_response,
+                                      std::move(response),
+                                      std::move(content_type)});
+    }
+
+
     curl_easy_cleanup(curl);
 
-    return result;
+    return response;
   }
 
 
-  Packages get_branch(const std::string &branch_name,
-                      const std::string &arch,
-                      const std::string &endpoint) {
+  tl::expected<Packages, Error> get_branch(const std::string &branch_name,
+                           const std::string &arch,
+                           const std::string &endpoint) {
     std::string result_request = endpoint+branch_name;
     if(arch!="") {
       result_request+="?arch="+arch;
     }
-    std::string get= curl_get(result_request);
-    auto json = json::parse(get);
-    if(json.contains("validation_message")) {
-      std::string error_msg = "Error when trying to get branch: ";
-      for(const std::string& str: json.at("validation_message").get<std::vector<std::string>>()) {
-        error_msg+=str+"\n";
-      }
-      throw WrongBranchNameException(error_msg);
+
+    auto get_result = curl_get(result_request);
+
+    if(!get_result) {
+      return tl::unexpected(get_result.error());
     }
-    return json.at("packages").get<Packages>();
+
+    auto json = json::parse(*get_result);
+
+    Packages packages;
+    json.at("packages").get_to(packages);
+    return packages;
   }
 
-  std::pair<Packages, Packages> get_branch_async(const std::string &branch1,
-                                                 const std::string &branch2,
-                                                 const std::string &arch,
-                                                 const std::string &endpoint) {
+  using pair_result = tl::expected<std::pair<Packages, Packages>, Error>;
+  pair_result get_branch_async(const std::string &branch1,
+                               const std::string &branch2,
+                               const std::string &arch,
+                               const std::string &endpoint) {
+    std::pair<Packages, Packages> result;
     auto f1 = std::async(std::launch::async,  get_branch, branch1, arch, endpoint);
     auto f2 = std::async(std::launch::async,  get_branch, branch2, arch, endpoint);
-    if(f1.valid() && f2.valid()) {
-      return std::make_pair(f1.get(), f2.get());
-    } else {
-      throw "TODO: Future is invalid";
-    }
 
+    tl::expected<Packages, Error> first;
+    tl::expected<Packages, Error> second;
+    if(f1.valid() && f2.valid()) {
+      first = f1.get();
+      second = f2.get();
+    } else {
+      //Fallback if futures are not valid for some reason
+      first = get_branch(branch1, arch, endpoint);
+      second = get_branch(branch2, arch, endpoint);
+    }
+    if(!first) {
+      return tl::unexpected(first.error());
+    }
+    if(!second) {
+      return tl::unexpected(second.error());
+    }
+    return std::make_pair(*first, *second);
   }
 
   std::map<Arch, Packages> packages_by_arch(const Packages& packages) {
@@ -380,6 +423,7 @@ namespace AltDiff {
     }
     return result;
   }
+
 
   std::map<Arch, Diff> diff_by_arch(const Packages& packages1,
                                     const Packages& packages2) {
@@ -398,11 +442,14 @@ namespace AltDiff {
     return j.get<std::map<Arch, Diff>>();
   }
 
-  json get_diff(const std::string& branch1, const std::string& branch2,
+  tl::expected<json, Error> get_diff(const std::string& branch1, const std::string& branch2,
                 const std::string &arch,
                 const std::string &endpoint) {
-    auto [first, second] = get_branch_async(branch1, branch2, arch, endpoint);
-    auto diffs = diff_by_arch(first, second);
+    auto pair = get_branch_async(branch1, branch2, arch, endpoint);
+    if(!pair) {
+      return tl::unexpected(pair.error());
+    }
+    auto diffs = diff_by_arch((*pair).first, (*pair).second);
     return diffs;
   }
 }

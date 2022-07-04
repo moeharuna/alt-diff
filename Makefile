@@ -1,5 +1,5 @@
 LIB = libalt-diff/altdiff.cpp
-INCLUDE = -I include/ -I libalt-diff/
+INCLUDE = -Iinclude/ -Ilibalt-diff/
 LINK = "-lcurl"
 CFLAGS = -Wall
 BIN = alt-diff/main.cpp

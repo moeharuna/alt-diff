@@ -1,10 +1,12 @@
 #include <iostream>
 #include <sys/ioctl.h>
-#include "altdiff.h"
 #include <stdlib.h>
+#include "altdiff.h"
+
 void print_package(const AltDiff::Package& package) {
   std::cout<<package.name();
 }
+
 void print_ver_missmatch(const AltDiff::VersionMissmatch & vm, size_t left_fill=0) {
   std::cout<<std::left<<std::setw(left_fill);
   std::cout<<vm.name()+": ";
@@ -45,6 +47,24 @@ void print_diff(const AltDiff::Diff &diff) {
   }
 }
 
+
+
+void describe_error(const AltDiff::Error& error) {
+  if(std::holds_alternative<AltDiff::CurlError>(error)) {
+    auto err = std::get<AltDiff::CurlError>(error);
+    std::cout<<"Curl error(" <<err.code<<") error desc:\n";
+    std::cout<<err.error_desc<<"\n";
+  }
+  else if(std::holds_alternative<AltDiff::HttpError>(error)) {
+    auto err = std::get<AltDiff::HttpError>(error);
+    std::cout<<"Unexpexted Http answer: "<<err.http_response_code<<" "<<err.content_type<<"\n";
+    std::cout<<err.response_body<<"\n";
+
+  } else {
+    std::cout<<"Unknown error\n";
+  }
+}
+
 int main(int argc, char *argv[]) {
   if(argc < 3 || argc > 4 || strcmp(argv[1], "-h")==0 || strcmp(argv[1], "--help")==0) {
     std::cout<<"Usage: "<<argv[0]<<" <branch1> <branch2> <arch>(optional)";
@@ -56,16 +76,16 @@ int main(int argc, char *argv[]) {
   if(argc==4) {
     arch = argv[3];
   }
-  try {
-    auto diff = AltDiff::get_diff(branch1, branch2, arch);
-    std::map<AltDiff::Arch, AltDiff::Diff> diff_map = diff;
-    for(const auto& [arch, diff] :diff_map) {
-      std::cout<<"["<<arch<<"] = \n";
-      print_diff(diff);
-    }
-  } catch(const std::exception& e) {
-    std::cout<<e.what()<<"\n";
-  }
 
+  auto diff = AltDiff::get_diff(branch1, branch2, arch);
+  if(!diff) {
+    describe_error(diff.error());
+    return 1;
+  }
+  std::map<AltDiff::Arch, AltDiff::Diff> diff_map = *diff;
+  for(const auto& [arch, diff] :diff_map) {
+    std::cout<<"["<<arch<<"] = \n";
+    print_diff(diff);
+  }
   return 0;
 }
