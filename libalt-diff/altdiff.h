@@ -118,15 +118,21 @@ namespace AltDiff {
     std::string content_type;
   };
 
-  using Error = std::variant<CurlError, HttpError>;
+  struct JsonError {
+    public:
+    JsonError(nlohmann::json::exception&);
+    std::shared_ptr<nlohmann::json::exception> catched_exception;
+  };
+
+  using Error = std::variant<CurlError, HttpError, JsonError>;
 
   //Returns diffrence between two branches in json format
   //Its using one of c++23 std::expected implementaions for error handling
   tl::expected<nlohmann::json, Error> get_diff(const std::string& branch1, const std::string& branch2,
                                                const std::string &arch="",
                                                const std::string &endpoint="https://rdb.altlinux.org/api/export/branch_binary_packages/");
-  //You can also parse json using nlogman::json.get instead
-  std::map<Arch, Diff> parse_json(nlohmann::json&);
+  //Parse json without exceptions. Use nlohmann::json.get if you want exceptions instead of expected.
+  tl::expected<std::map<Arch, Diff>, Error> parse_json(nlohmann::json&);
 }
 
 #endif // ALTDIFF_H_

@@ -60,6 +60,12 @@ void describe_error(const AltDiff::Error& error) {
     std::cout<<"Unexpexted Http answer: "<<err.http_response_code<<" "<<err.content_type<<"\n";
     std::cout<<err.response_body<<"\n";
 
+  } else if(std::holds_alternative<AltDiff::JsonError>(error)) {
+    auto err = std::get<AltDiff::JsonError>(error);
+    std::cout<<"Json parsing error: ";
+    std::cout<<err.catched_exception->what();
+    std::cout<<"\n";
+
   } else {
     std::cout<<"Unknown error\n";
   }
@@ -82,8 +88,13 @@ int main(int argc, char *argv[]) {
     describe_error(diff.error());
     return 1;
   }
-  std::map<AltDiff::Arch, AltDiff::Diff> diff_map = *diff;
-  for(const auto& [arch, diff] :diff_map) {
+
+  auto diff_map = AltDiff::parse_json(*diff);
+  if(!diff_map) {
+    describe_error(diff.error());
+    return 1;
+  }
+  for(const auto& [arch, diff] :*diff_map) {
     std::cout<<"["<<arch<<"] = \n";
     print_diff(diff);
   }

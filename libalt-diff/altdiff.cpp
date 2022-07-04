@@ -320,6 +320,9 @@ namespace AltDiff {
     :http_response_code{http_response_code},
      response_body{body},
      content_type{content_type} {}
+  JsonError::JsonError(json::exception& except)
+    :catched_exception{std::make_shared<json::exception>(except)} {}
+
 
   tl::expected<std::string, Error> curl_get(const std::string &url) {
     char curl_error_buffer[CURL_ERROR_SIZE];
@@ -438,8 +441,12 @@ namespace AltDiff {
 
 
 
-  std::map<Arch, Diff> parse_json(nlohmann::json& j) {
-    return j.get<std::map<Arch, Diff>>();
+  tl::expected<std::map<Arch, Diff>, Error> parse_json(nlohmann::json& j) {
+    try {
+      return j.get<std::map<Arch, Diff>>();
+    } catch(json::exception& e) {
+      return tl::unexpected(JsonError{e});
+    }
   }
 
   tl::expected<json, Error> get_diff(const std::string& branch1, const std::string& branch2,
