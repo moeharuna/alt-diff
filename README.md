@@ -1,17 +1,27 @@
 # alt-diff
 This repo contains library alt-diff with example application.
-alt-diff will get list of all packages from alt-linux distributive branches
+alt-diff will get list of all packages from two alt-linux distributive branches
 and will compare these branches.
 
 ## Building
-To build the example, run these commands in your terminal:
-```sh
-git clone git@github.com:moeharuna/alt-diff.git
-cd alt-diff
-make
-```
+You can build 4 targets: 
+  1. Statically* linked executable
+  2. Dynamically linked executable
+  3. Object file to statically link library
+  4. Shared library
+  
+Each has its own make command.
+
+  1. `make`
+  2. `make bin`
+  3. `make object`
+  4. `make lib`
+  
+All builds are inside `build/` directory.
+
+*Statically linked to libaltdiff, libcurl is still dependency
 ## Running
-`./alt-diff.out <branch1> <branch2> <arch>`
+`./altdiff.out <branch1> <branch2> <arch>`
 
 Where: 
 - branch1 and branch2 are names of branches you want to compare.
@@ -20,21 +30,19 @@ Where:
 The program will take some time and output will be huge,
 so you probably would want to redirect output into a file like so:
 
-`./alt-diff.out "p9" "p10" > result.txt`
+`./altdiff.out "p9" "p10" > result.txt`
 
 or to pipe it into less
 
-`./alt-diff.out "p9" "p10" | less`
+`./altdiff.out "p9" "p10" | less`
 
 ## Installing
-- Binary
-  1. Build executable using `make` or `make bin`.
-  2. Copy altdiff.out to any directory from your $PATH env variable.
-- Library
-  1. Build library using `make lib`.
-  2. Copy `libalt-diff/altdiff.h` to your include path.
-  3. Copy `libaltdiff.so` to your LD_LIBRARY_PATH.
-  4. Link with `libaltdiff.so` by passing `-laltdiff` flag to your compiler.
+1. Open Makefile. Make sure that variables `INCLUDE_PATH`, `LIBRARY_PATH` and `BIN_PATH` are exists and that they point to the right directories for your system.
+2. Run `make install` to install libaltdiff. Or alternatively if you want to install both executable and libaltdiff run `make installbin`.
+
+## Uninstalling
+Run `make remove`.
+
 ## Requirements
 - libCurl
 
