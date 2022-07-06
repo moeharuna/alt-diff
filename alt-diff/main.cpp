@@ -28,7 +28,7 @@ void print_diff(const AltDiff::Diff &diff) {
     } else {
       std::cout<<std::right<<std::setw(max_len+2);
     }
-    //move_cursor_to_center();
+
     std::cout<<"| ";
     if(right < diff.right_only().size()) {
       print_package(diff.right_only().at(right));
