@@ -8,9 +8,9 @@
 #include <algorithm>
 #include <memory>
 #include <json.hpp>
-#include <expected.hpp>
+#include <boost/outcome/outcome.hpp>
 using namespace nlohmann;
-
+using namespace boost;
 
 
 
@@ -324,7 +324,7 @@ namespace AltDiff {
     :catched_exception{std::make_shared<json::exception>(except)} {}
 
 
-  tl::expected<std::string, Error> curl_get(const std::string &url) {
+  outcome_v2::result<std::string, Error> curl_get(const std::string &url) noexcept{
     char curl_error_buffer[CURL_ERROR_SIZE];
     long http_response;
     CURL* curl;
@@ -332,7 +332,7 @@ namespace AltDiff {
     std::string content_type{};
     curl = curl_easy_init();
     if(curl==NULL) {
-      return tl::unexpected(CurlError{});
+      return CurlError{};
     }
     std::string response;
     response.reserve(10'000);
@@ -346,7 +346,7 @@ namespace AltDiff {
 
     if(err_code != CURLE_OK) {
       std::string error_str{curl_error_buffer};
-      return tl::unexpected(CurlError{err_code, std::move(error_str)});
+      return CurlError{err_code, std::move(error_str)};
     }
 
     curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_response);
@@ -354,9 +354,9 @@ namespace AltDiff {
     if(ct != NULL)
       content_type = ct;
     if(http_response!=200) {
-      return tl::unexpected(HttpError{http_response,
-                                      std::move(response),
-                                      std::move(content_type)});
+      return HttpError{http_response,
+                       std::move(response),
+                       std::move(content_type)};
     }
 
 
@@ -366,9 +366,9 @@ namespace AltDiff {
   }
 
 
-  tl::expected<Packages, Error> get_branch(const std::string &branch_name,
-                           const std::string &arch,
-                           const std::string &endpoint) {
+  outcome_v2::result<Packages, Error> get_branch(const std::string &branch_name,
+                                                 const std::string &arch,
+                                                 const std::string &endpoint) noexcept{
     std::string result_request = endpoint+branch_name;
     if(arch!="") {
       result_request+="?arch="+arch;
@@ -377,45 +377,37 @@ namespace AltDiff {
     auto get_result = curl_get(result_request);
 
     if(!get_result) {
-      return tl::unexpected(get_result.error());
+      return get_result.error();
     }
 
-    auto json = json::parse(*get_result);
+    auto json = json::parse(get_result.value());
 
     Packages packages;
     json.at("packages").get_to(packages);
     return packages;
   }
 
-  using pair_result = tl::expected<std::pair<Packages, Packages>, Error>;
-  pair_result get_branch_async(const std::string &branch1,
+  outcome_v2::result<std::pair<Packages, Packages>, Error> get_branch_async(const std::string &branch1,
                                const std::string &branch2,
                                const std::string &arch,
-                               const std::string &endpoint) {
+                               const std::string &endpoint) noexcept{
     std::pair<Packages, Packages> result;
     auto f1 = std::async(std::launch::async,  get_branch, branch1, arch, endpoint);
     auto f2 = std::async(std::launch::async,  get_branch, branch2, arch, endpoint);
 
-    tl::expected<Packages, Error> first;
-    tl::expected<Packages, Error> second;
-    if(f1.valid() && f2.valid()) {
-      first = f1.get();
-      second = f2.get();
-    } else {
-      //Fallback if futures are not valid for some reason
-      first = get_branch(branch1, arch, endpoint);
-      second = get_branch(branch2, arch, endpoint);
-    }
+    outcome_v2::result<Packages, Error> first =  f1.valid() ? f1.get() : get_branch(branch1, arch, endpoint);
+    outcome_v2::result<Packages, Error> second = f2.valid() ? f2.get() : get_branch(branch2, arch, endpoint);
+
     if(!first) {
-      return tl::unexpected(first.error());
+      return first.error();
     }
     if(!second) {
-      return tl::unexpected(second.error());
+      return second.error();
     }
-    return std::make_pair(*first, *second);
+    return std::make_pair(first.value(), second.value());
   }
 
-  std::map<Arch, Packages> packages_by_arch(const Packages& packages) {
+  std::map<Arch, Packages> packages_by_arch(const Packages& packages) noexcept{
     std::map<Arch, Packages> result;
     for(const auto &package : packages) {
       if(result.count(package.arch())==0)
@@ -429,7 +421,7 @@ namespace AltDiff {
 
 
   std::map<Arch, Diff> diff_by_arch(const Packages& packages1,
-                                    const Packages& packages2) {
+                                    const Packages& packages2) noexcept{
     auto pack1 = packages_by_arch(packages1);
     auto pack2 = packages_by_arch(packages2);
     std::map<Arch, Diff> result;
@@ -441,22 +433,22 @@ namespace AltDiff {
 
 
 
-  tl::expected<std::map<Arch, Diff>, Error> parse_json(nlohmann::json& j) {
+  outcome_v2::result<std::map<Arch, Diff>, Error> parse_json(nlohmann::json& j) noexcept{
     try {
       return j.get<std::map<Arch, Diff>>();
     } catch(json::exception& e) {
-      return tl::unexpected(JsonError{e});
+      return JsonError{e};
     }
   }
 
-  tl::expected<json, Error> get_diff(const std::string& branch1, const std::string& branch2,
+  outcome_v2::result<json, Error> get_diff(const std::string& branch1, const std::string& branch2,
                 const std::string &arch,
-                const std::string &endpoint) {
+                const std::string &endpoint) noexcept{
     auto pair = get_branch_async(branch1, branch2, arch, endpoint);
     if(!pair) {
-      return tl::unexpected(pair.error());
+      return pair.error();
     }
-    auto diffs = diff_by_arch((*pair).first, (*pair).second);
+    auto diffs = diff_by_arch(pair.value().first, pair.value().second);
     return diffs;
   }
 }

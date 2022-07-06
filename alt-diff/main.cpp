@@ -89,12 +89,12 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  auto diff_map = AltDiff::parse_json(*diff);
+  auto diff_map = AltDiff::parse_json(diff.value());
   if(!diff_map) {
     describe_error(diff.error());
     return 1;
   }
-  for(const auto& [arch, diff] :*diff_map) {
+  for(const auto& [arch, diff] :diff_map.value()) {
     std::cout<<"["<<arch<<"] = \n";
     print_diff(diff);
   }

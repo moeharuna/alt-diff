@@ -4,7 +4,7 @@
 #include <map>
 #include <variant>
 #include <json.hpp>
-#include <expected.hpp>
+#include <boost/outcome/outcome.hpp>
 #include <curl/curl.h>
 namespace AltDiff {
   using Arch = std::string;
@@ -125,14 +125,13 @@ namespace AltDiff {
   };
 
   using Error = std::variant<CurlError, HttpError, JsonError>;
-
   //Returns diffrence between two branches in json format
   //Its using one of c++23 std::expected implementaions for error handling
-  tl::expected<nlohmann::json, Error> get_diff(const std::string& branch1, const std::string& branch2,
+  boost::outcome_v2::result<nlohmann::json, Error> get_diff(const std::string& branch1, const std::string& branch2,
                                                const std::string &arch="",
-                                               const std::string &endpoint="https://rdb.altlinux.org/api/export/branch_binary_packages/");
+                                               const std::string &endpoint="https://rdb.altlinux.org/api/export/branch_binary_packages/") noexcept;
   //Parse json without exceptions. Use nlohmann::json.get if you want exceptions instead of expected.
-  tl::expected<std::map<Arch, Diff>, Error> parse_json(nlohmann::json&);
+  boost::outcome_v2::result<std::map<Arch, Diff>, Error> parse_json(nlohmann::json&) noexcept;
 }
 
 #endif // ALTDIFF_H_
