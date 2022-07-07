@@ -19,7 +19,7 @@ Each has its own make command.
   
 All builds are inside `build/` directory.
 
-*Statically linked to libaltdiff, libcurl is still dependency
+*Statically linked to libaltdiff, requirements section is still dynamicly linked.
 ## Running
 `./altdiff.out <branch1> <branch2> <arch>`
 
