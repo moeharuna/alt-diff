@@ -7,7 +7,7 @@ INCLUDE = -Ilibalt-diff/
 LINK = -lcurl
 CFLAGS = -Wall
 STD = c++17
-CC = gcc
+CC = g++
 DEBUG_FLAGS = -g
 COMPILE_COMMAND = $(CC) --std=$(STD) $(CFLAGS) $(INCLUDE) $(LINK)
 
