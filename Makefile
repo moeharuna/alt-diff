@@ -7,19 +7,21 @@ INCLUDE = -Ilibalt-diff/
 LINK = -lcurl
 CFLAGS = -Wall
 STD = c++17
-CC = g++
+CC = gcc
 DEBUG_FLAGS = -g
 COMPILE_COMMAND = $(CC) --std=$(STD) $(CFLAGS) $(INCLUDE) $(LINK)
 
-all: default lib
+all: lib default
 
 bin: lib
+	mkdir -p build
 	$(COMPILE_COMMAND) -Lbuild -laltdiff $(BIN)  -o build/altdiff
 
 lib:
 	mkdir -p build
 	$(COMPILE_COMMAND) -fPIC -shared $(LIB) -o build/libaltdiff.so
 default:
+	mkdir -p build
 	$(COMPILE_COMMAND) $(LIB) $(BIN)  -o build/altdiff
 
 install: bininstall
