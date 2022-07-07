@@ -11,32 +11,23 @@ CC = g++
 DEBUG_FLAGS = -g
 COMPILE_COMMAND = $(CC) --std=$(STD) $(CFLAGS) $(INCLUDE) $(LINK)
 
-staticbin: $(BIN) $(LIB)
-	make object
-	$(COMPILE_COMMAND) build/libaltdiff.o $(BIN) -o build/altdiff.out
+all: bin
 
-object: $(LIB)
-	mkdir -p build
-	$(COMPILE_COMMAND) -fPIC -c  $(LIB)  -o  build/libaltdiff.o
+bin: lib
+	$(COMPILE_COMMAND) -Lbuild -laltdiff $(BIN)  -o build/altdiff
 
-bin: $(BIN) $(LIB)
-	make lib
-	$(COMPILE_COMMAND) -Lbuild -laltdiff $(BIN)  -o build/altdiff.out
-
-lib: $(LIB)
+lib:
 	mkdir -p build
 	$(COMPILE_COMMAND) -fPIC -shared $(LIB) -o build/libaltdiff.so
 
-install: $(LIB)
-	make lib
-	strip build/libaltdiff.so
-	cp build/libaltdiff.so $(LIBRARY_PATH)
-	cp libalt-diff/altdiff.h $(INCLUDE_PATH)
+install: bininstall
 
-installbin: $(BIN) $(LIB)
-	make install
-	make bin
-	cp build/altdiff.out $(BIN_PATH)/altdiff
+libinstall: lib
+	install build/libaltdiff.so $(LIBRARY_PATH)
+	install libalt-diff/altdiff.h $(INCLUDE_PATH)
+
+bininstall: libinstall bin
+	install build/altdiff $(BIN_PATH)/altdiff
 
 remove:
 	rm -f $(LIBRARY_PATH)/libaltdiff.so
@@ -44,4 +35,4 @@ remove:
 	rm -f $(BIN_PATH)/altdiff
 
 clean:
-	rm -f build/altdiff.out build/libaltdiff.so build/libaltdiff.o
+	rm -f build/altdiff build/libaltdiff.so build/libaltdiff.o

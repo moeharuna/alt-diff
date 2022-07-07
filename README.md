@@ -4,24 +4,11 @@ alt-diff will get list of all packages from two alt-linux distributive branches
 and will compare these branches.
 
 ## Building
-You can build 4 targets: 
-  1. Statically* linked executable
-  2. Dynamically linked executable
-  3. Object file to statically link library
-  4. Shared library
-  
-Each has its own make command.
+Run `make` in repo directory to build project.
+You can also run `make lib` to build only shared library.
 
-  1. `make`
-  2. `make bin`
-  3. `make object`
-  4. `make lib`
-  
-All builds are inside `build/` directory.
-
-*Statically linked to libaltdiff, requirements section is still dynamicly linked.
 ## Running
-`./altdiff.out <branch1> <branch2> <arch>`
+`./altdiff <branch1> <branch2> <arch>`
 
 Where: 
 - branch1 and branch2 are names of branches you want to compare.
@@ -30,15 +17,14 @@ Where:
 The program will take some time and output will be huge,
 so you probably would want to redirect output into a file like so:
 
-`./altdiff.out "p9" "p10" > result.txt`
+`./altdiff "p9" "p10" > result.txt`
 
 or to pipe it into less
 
-`./altdiff.out "p9" "p10" | less`
+`./altdiff "p9" "p10" | less`
 
 ## Installing
-1. Open Makefile. Make sure that variables `INCLUDE_PATH`, `LIBRARY_PATH` and `BIN_PATH` are exists and that they point to the right directories for your system.
-2. Run `make install` to install libaltdiff. Or alternatively if you want to install both executable and libaltdiff run `make installbin`.
+Run `make install` to install altdiff. Or alternatively if you don't need alt-diff binary run `make libinstall`
 
 ## Uninstalling
 Run `make remove`.
