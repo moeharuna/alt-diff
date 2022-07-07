@@ -60,9 +60,9 @@ void describe_error(const AltDiff::Error& error) {
     std::cout<<"Unexpexted Http answer: "<<err.http_response_code<<" "<<err.content_type<<"\n";
     std::cout<<err.response_body<<"\n";
 
-  } else if(std::holds_alternative<AltDiff::JsonError>(error)) {
-    auto err = std::get<AltDiff::JsonError>(error);
-    std::cout<<"Json parsing error: ";
+  } else if(std::holds_alternative<AltDiff::ExceptionError>(error)) {
+    auto err = std::get<AltDiff::ExceptionError>(error);
+    std::cout<<"Exception inside library was catched: ";
     std::cout<<err.catched_exception->what();
     std::cout<<"\n";
 

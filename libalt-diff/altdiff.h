@@ -3,7 +3,7 @@
 #include <string>
 #include <map>
 #include <variant>
-#include <json.hpp>
+#include <boost/json.hpp>
 #include <boost/outcome/outcome.hpp>
 #include <curl/curl.h>
 namespace AltDiff {
@@ -25,8 +25,8 @@ namespace AltDiff {
     bool operator!=(const Version&) const;
     bool operator==(const Version&) const;
 
-    friend void to_json(nlohmann::json& j, const Version& v);
-    friend void from_json(const nlohmann::json& j, Version& v);
+    friend void    tag_invoke(boost::json::value_from_tag, boost::json::value& jv, Version const&);
+    friend Version tag_invoke(boost::json::value_to_tag<Version>, boost::json::value const& jv);
 
   private:
     struct Impl;
@@ -45,8 +45,8 @@ namespace AltDiff {
     const Version &version() const;
     const Arch &arch() const;
 
-    friend void to_json(nlohmann::json& j, const Package& p);
-    friend void from_json(const nlohmann::json& j, Package& p);
+    friend void    tag_invoke(boost::json::value_from_tag, boost::json::value& jv, Package const&);
+    friend Package tag_invoke(boost::json::value_to_tag<Package>, boost::json::value const& jv);
   private:
 
     struct Impl;
@@ -67,8 +67,8 @@ namespace AltDiff {
     const std::string& name() const;
     const Arch& arch() const;
 
-    friend void from_json(const nlohmann::json& j, VersionMissmatch& vm);
-    friend void to_json(nlohmann::json& j, const VersionMissmatch& vm);
+    friend void             tag_invoke(boost::json::value_from_tag, boost::json::value& jv, VersionMissmatch const&);
+    friend VersionMissmatch tag_invoke(boost::json::value_to_tag<VersionMissmatch>, boost::json::value const& jv);
 
   private:
     struct Impl;
@@ -90,8 +90,8 @@ namespace AltDiff {
     const std::vector<Package>& right_only() const;
     const std::vector<VersionMissmatch>& version_diff() const;
 
-    friend void from_json(const nlohmann::json& j, Diff& diff);
-    friend void to_json(nlohmann::json& j, const Diff& diff);
+    friend void tag_invoke(boost::json::value_from_tag, boost::json::value& jv, Diff const&);
+    friend Diff tag_invoke(boost::json::value_to_tag<Diff>, boost::json::value const& jv);
   private:
     //I use pimpl to hide implimentation of all my classes.
     struct Impl;
@@ -118,20 +118,19 @@ namespace AltDiff {
     std::string content_type;
   };
 
-  struct JsonError {
+  struct ExceptionError {
     public:
-    JsonError(nlohmann::json::exception&);
-    std::shared_ptr<nlohmann::json::exception> catched_exception;
+    ExceptionError(std::exception&);
+    std::shared_ptr<std::exception> catched_exception;
   };
 
-  using Error = std::variant<CurlError, HttpError, JsonError>;
+  using Error = std::variant<CurlError, HttpError, ExceptionError>;
   //Returns diffrence between two branches in json format
-  //Its using one of c++23 std::expected implementaions for error handling
-  boost::outcome_v2::result<nlohmann::json, Error> get_diff(const std::string& branch1, const std::string& branch2,
+  boost::outcome_v2::result<boost::json::value, Error> get_diff(const std::string& branch1, const std::string& branch2,
                                                const std::string &arch="",
                                                const std::string &endpoint="https://rdb.altlinux.org/api/export/branch_binary_packages/") noexcept;
-  //Parse json without exceptions. Use nlohmann::json.get if you want exceptions instead of expected.
-  boost::outcome_v2::result<std::map<Arch, Diff>, Error> parse_json(nlohmann::json&) noexcept;
+  //Parse json without exceptions. Use boost::json::value_from if you want exceptions instead of result.
+  boost::outcome_v2::result<std::map<Arch, Diff>, Error> parse_json(boost::json::value&) noexcept;
 }
 
 #endif // ALTDIFF_H_

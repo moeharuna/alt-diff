@@ -7,9 +7,8 @@
 #include <future>
 #include <algorithm>
 #include <memory>
-#include <json.hpp>
 #include <boost/outcome/outcome.hpp>
-using namespace nlohmann;
+#include <boost/json/src.hpp>
 using namespace boost;
 
 
@@ -95,13 +94,14 @@ namespace AltDiff {
     return !(*this!=b);
   }
 
-  void to_json(nlohmann::json& j, const Version &v) {
-    j = v.pImpl->version_string_;
-  }
 
-  void from_json(const nlohmann::json&j, Version &v) {
-    j.get_to(v.pImpl->version_string_);
+  void tag_invoke(boost::json::value_from_tag, boost::json::value& jv, Version const& v) {
+    jv = v.pImpl->version_string_;
+  }
+  Version tag_invoke(boost::json::value_to_tag<Version>, boost::json::value const& jv) {
+    Version v = Version{jv.as_string().subview()};
     v.pImpl->parse_version_vec();
+    return v;
   }
 
   struct Package::Impl {
@@ -135,16 +135,17 @@ namespace AltDiff {
     return pImpl->arch_;
   }
 
-  void to_json(json &j, const Package &p) {
-    j= {{"name", p.pImpl->name_},
-        {"arch", p.pImpl->arch_},
-        {"version", p.pImpl->version_}};
+  void  tag_invoke(boost::json::value_from_tag, boost::json::value& jv, Package const& p) {
+    jv= {{"name", p.pImpl->name_},
+         {"arch", p.pImpl->arch_},
+         {"version", p.pImpl->version_}};
   }
-
-  void from_json(const json &j, Package &p) {
-    p.pImpl->name_= j.at("name").get<std::string>();
-    p.pImpl->arch_ = j.at("arch").get<Arch>();
-    p.pImpl->version_ = j.at("version").get<Version>();
+  Package tag_invoke(boost::json::value_to_tag<Package>, boost::json::value const& jv) {
+    Package p;
+    p.pImpl->name_= jv.at("name").as_string();
+    p.pImpl->arch_ = jv.at("arch").as_string();
+    p.pImpl->version_ = json::serialize(jv.at("version"));
+    return p;
   }
 
   using Packages = std::vector<Package>;
@@ -200,18 +201,21 @@ namespace AltDiff {
     return pImpl->arch_;
   }
 
-  void from_json(const json &j, VersionMissmatch &vm) {
-    vm.pImpl->name_ = j.at("name").get<std::string>();
-    vm.pImpl->arch_ = j.at("arch").get<Arch>();
-    vm.pImpl->left_ver_ = j.at("left").get<Version>();
-    vm.pImpl->right_ver_ = j.at("right").get<Version>();
-  }
-
-  void to_json(json &j, const VersionMissmatch &vm) {
-    j = {{"name",  vm.pImpl->name_},
+  void tag_invoke(boost::json::value_from_tag, boost::json::value& jv, VersionMissmatch const& vm) {
+    jv = {{"name",  vm.pImpl->name_},
          {"arch",  vm.pImpl->arch_},
          {"left",  vm.pImpl->left_ver_},
          {"right", vm.pImpl->right_ver_}};
+
+  }
+
+  VersionMissmatch tag_invoke(boost::json::value_to_tag<VersionMissmatch>, boost::json::value const& jv) {
+    VersionMissmatch vm;
+    vm.pImpl->name_ = jv.at("name").as_string();
+    vm.pImpl->arch_ = jv.at("arch").as_string();
+    vm.pImpl->left_ver_ = json::serialize(jv.at("left"));
+    vm.pImpl->right_ver_ = json::serialize(jv.at("right"));
+    return vm;
   }
 
   std::vector<VersionMissmatch> version_set_diffrence(const Packages &first, const Packages &second) {
@@ -288,17 +292,21 @@ namespace AltDiff {
     return pImpl->version_missmatch_;
   }
 
-  void from_json(const json& j, Diff& diff) {
-    diff.pImpl->only_left_ = j.at("left").get<Packages>();
-    diff.pImpl->only_right_ = j.at("right").get<Packages>();
-    diff.pImpl->version_missmatch_ = j.at("version").get<std::vector<VersionMissmatch>>();
-  }
-
-  void to_json(json& j, const Diff& diff) {
-    j= {{"left", diff.pImpl->only_left_},
+  void tag_invoke(boost::json::value_from_tag, boost::json::value& jv, Diff const& diff) {
+    jv= {{"left", diff.pImpl->only_left_},
         {"right", diff.pImpl->only_right_},
         {"version", diff.pImpl->version_missmatch_}};
   }
+
+  Diff tag_invoke(boost::json::value_to_tag<Diff>, boost::json::value const& jv) {
+    Diff diff;
+    diff.pImpl->only_left_ = json::value_to<Packages>(jv.at("left"));
+    diff.pImpl->only_right_ = json::value_to<Packages>(jv.at("right"));
+    diff.pImpl->version_missmatch_ = json::value_to<std::vector<VersionMissmatch>>(jv.at("version"));
+    return diff;
+  }
+
+
 
 
   size_t curl_callback(char *data, size_t size, size_t nmemb, void *strptr) {
@@ -320,11 +328,11 @@ namespace AltDiff {
     :http_response_code{http_response_code},
      response_body{body},
      content_type{content_type} {}
-  JsonError::JsonError(json::exception& except)
-    :catched_exception{std::make_shared<json::exception>(except)} {}
+  ExceptionError::ExceptionError(std::exception& except)
+    :catched_exception{std::make_shared<std::exception>(except)} {}
 
 
-  outcome_v2::result<std::string, Error> curl_get(const std::string &url) noexcept{
+  outcome_v2::result<std::string, Error> curl_get(const std::string &url) {
     char curl_error_buffer[CURL_ERROR_SIZE];
     long http_response;
     CURL* curl;
@@ -368,7 +376,7 @@ namespace AltDiff {
 
   outcome_v2::result<Packages, Error> get_branch(const std::string &branch_name,
                                                  const std::string &arch,
-                                                 const std::string &endpoint) noexcept{
+                                                 const std::string &endpoint) {
     std::string result_request = endpoint+branch_name;
     if(arch!="") {
       result_request+="?arch="+arch;
@@ -383,14 +391,14 @@ namespace AltDiff {
     auto json = json::parse(get_result.value());
 
     Packages packages;
-    json.at("packages").get_to(packages);
+    packages = json::value_to<Packages>(json.at("packages"));
     return packages;
   }
 
   outcome_v2::result<std::pair<Packages, Packages>, Error> get_branch_async(const std::string &branch1,
                                const std::string &branch2,
                                const std::string &arch,
-                               const std::string &endpoint) noexcept{
+                               const std::string &endpoint) {
     std::pair<Packages, Packages> result;
     auto f1 = std::async(std::launch::async,  get_branch, branch1, arch, endpoint);
     auto f2 = std::async(std::launch::async,  get_branch, branch2, arch, endpoint);
@@ -407,7 +415,7 @@ namespace AltDiff {
     return std::make_pair(first.value(), second.value());
   }
 
-  std::map<Arch, Packages> packages_by_arch(const Packages& packages) noexcept{
+  std::map<Arch, Packages> packages_by_arch(const Packages& packages) {
     std::map<Arch, Packages> result;
     for(const auto &package : packages) {
       if(result.count(package.arch())==0)
@@ -421,7 +429,7 @@ namespace AltDiff {
 
 
   std::map<Arch, Diff> diff_by_arch(const Packages& packages1,
-                                    const Packages& packages2) noexcept{
+                                    const Packages& packages2) {
     auto pack1 = packages_by_arch(packages1);
     auto pack2 = packages_by_arch(packages2);
     std::map<Arch, Diff> result;
@@ -433,22 +441,26 @@ namespace AltDiff {
 
 
 
-  outcome_v2::result<std::map<Arch, Diff>, Error> parse_json(nlohmann::json& j) noexcept{
+  outcome_v2::result<std::map<Arch, Diff>, Error> parse_json(json::value &jv) noexcept{
     try {
-      return j.get<std::map<Arch, Diff>>();
-    } catch(json::exception& e) {
-      return JsonError{e};
+      return json::value_to<std::map<Arch, Diff>>(jv);
+    } catch(std::exception& e) {
+      return ExceptionError{e};
     }
   }
 
-  outcome_v2::result<json, Error> get_diff(const std::string& branch1, const std::string& branch2,
+  outcome_v2::result<json::value, Error> get_diff(const std::string& branch1, const std::string& branch2,
                 const std::string &arch,
                 const std::string &endpoint) noexcept{
-    auto pair = get_branch_async(branch1, branch2, arch, endpoint);
-    if(!pair) {
-      return pair.error();
+    try {
+      auto pair = get_branch_async(branch1, branch2, arch, endpoint);
+      if(!pair) {
+        return pair.error();
+      }
+      auto diffs = diff_by_arch(pair.value().first, pair.value().second);
+      return json::value_from(diffs);
+    } catch(std::exception& e) {
+      return ExceptionError{e};
     }
-    auto diffs = diff_by_arch(pair.value().first, pair.value().second);
-    return diffs;
   }
 }
