@@ -3,6 +3,7 @@
 #include <string>
 #include <map>
 #include <variant>
+#include <vector>
 #include <boost/json.hpp>
 #include <boost/outcome/outcome.hpp>
 #include <curl/curl.h>

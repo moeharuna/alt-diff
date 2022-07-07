@@ -1,28 +1,28 @@
 INCLUDE_PATH=/usr/include
-LIBRARY_PATH=/usr/lib
+LIBRARY_PATH=/usr/lib64
 BIN_PATH=/usr/bin
 LIB = libalt-diff/altdiff.cpp
 BIN = alt-diff/main.cpp
 INCLUDE = -Ilibalt-diff/
-LINK = -lcurl
+LINK = -lcurl -lpthread
 CFLAGS = -Wall
 STD = c++17
 CC = g++
 DEBUG_FLAGS = -g
-COMPILE_COMMAND = $(CC) --std=$(STD) $(CFLAGS) $(INCLUDE) $(LINK)
+COMPILE_COMMAND = $(CC) --std=$(STD) $(CFLAGS) $(INCLUDE)
 
 all: lib default
 
 bin: lib
 	mkdir -p build
-	$(COMPILE_COMMAND) -Lbuild -laltdiff $(BIN)  -o build/altdiff
+	$(COMPILE_COMMAND) -Lbuild -laltdiff $(BIN) $(LINK)  -o build/altdiff
 
 lib:
 	mkdir -p build
 	$(COMPILE_COMMAND) -fPIC -shared $(LIB) -o build/libaltdiff.so
 default:
 	mkdir -p build
-	$(COMPILE_COMMAND) $(LIB) $(BIN)  -o build/altdiff
+	$(COMPILE_COMMAND) $(LIB) $(BIN) $(LINK)  -o build/altdiff
 
 install: bininstall
 
