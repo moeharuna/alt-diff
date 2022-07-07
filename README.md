@@ -45,4 +45,4 @@ Run `make remove`.
 
 ## Requirements
 - libCurl
-
+- Boost
