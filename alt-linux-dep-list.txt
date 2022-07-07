@@ -1,0 +1,5 @@
+boost-devel
+boost-devel-headers
+gcc
+gcc-c++
+libcurl-devel

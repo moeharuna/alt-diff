@@ -15,11 +15,11 @@ all: lib default
 
 bin: lib
 	mkdir -p build
-	$(COMPILE_COMMAND)  $(BIN) $(LINK) -Lbuild -laltdiff  -o build/altdiff
+	$(COMPILE_COMMAND)  $(BIN) -Lbuild -laltdiff  -o build/altdiff
 
 lib:
 	mkdir -p build
-	$(COMPILE_COMMAND) -fPIC -shared $(LIB) -o build/libaltdiff.so
+	$(COMPILE_COMMAND) -fPIC -shared $(LIB) $(LINK) -o build/libaltdiff.so
 default:
 	mkdir -p build
 	$(COMPILE_COMMAND) $(LIB) $(BIN) $(LINK)  -o build/altdiff
