@@ -142,8 +142,8 @@ namespace AltDiff {
   }
   Package tag_invoke(boost::json::value_to_tag<Package>, boost::json::value const& jv) {
     Package p;
-    p.pImpl->name_= jv.at("name").as_string();
-    p.pImpl->arch_ = jv.at("arch").as_string();
+    p.pImpl->name_= std::string(jv.at("name").as_string().subview());
+    p.pImpl->arch_ =std::string(jv.at("arch").as_string().subview());
     p.pImpl->version_ = json::value_to<Version>(jv.at("version"));
     return p;
   }
@@ -211,8 +211,8 @@ namespace AltDiff {
 
   VersionMissmatch tag_invoke(boost::json::value_to_tag<VersionMissmatch>, boost::json::value const& jv) {
     VersionMissmatch vm;
-    vm.pImpl->name_ = jv.at("name").as_string();
-    vm.pImpl->arch_ = jv.at("arch").as_string();
+    vm.pImpl->name_ = std::string(jv.at("name").as_string().subview());
+    vm.pImpl->arch_ = std::string(jv.at("arch").as_string().subview());
     vm.pImpl->left_ver_ = json::value_to<Version>(jv.at("left"));
     vm.pImpl->right_ver_ = json::value_to<Version>(jv.at("right"));
     return vm;
