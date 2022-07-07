@@ -15,7 +15,7 @@ all: lib default
 
 bin: lib
 	mkdir -p build
-	$(COMPILE_COMMAND) -Lbuild -laltdiff $(BIN) $(LINK)  -o build/altdiff
+	$(COMPILE_COMMAND)  $(BIN) $(LINK) -Lbuild -laltdiff  -o build/altdiff
 
 lib:
 	mkdir -p build
