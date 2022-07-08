@@ -1,6 +1,8 @@
 #include <iostream>
+#include <map>
 #include <sys/ioctl.h>
 #include <stdlib.h>
+#include <algorithm>
 #include "altdiff.h"
 
 void print_package(const AltDiff::Package& package) {
@@ -71,24 +73,55 @@ void describe_error(const AltDiff::Error& error) {
   }
 }
 
+std::vector<std::string>::iterator find_string(std::vector<std::string> &vec, const std::string& str) {
+  return std::find(vec.begin(), vec.end(), str);
+}
+
+std::vector<std::string> cpp_args(int argc, char*argv[]) {
+  std::vector<std::string> args;
+  for(int i=1; i<argc; ++i) {
+    args.push_back(argv[i]);
+  }
+  return args;
+}
+
+void human_print(std::map<AltDiff::Arch, AltDiff::Diff> diff) {
+  for(const auto& [arch, diff] :diff) {
+    std::cout<<"["<<arch<<"] = \n";
+    print_diff(diff);
+  }
+}
 int main(int argc, char *argv[]) {
-  if(argc < 3 || argc > 4 || strcmp(argv[1], "-h")==0 || strcmp(argv[1], "--help")==0) {
+  auto args = cpp_args(argc, argv);
+  if(args.size() < 2 || args.size() > 4
+     || (find_string(args, "--help") != std::end(args))
+     || (find_string(args, "-h"))    != std::end(args)) {
     std::cout<<"Usage: "<<argv[0]<<" <branch1> <branch2> <arch>(optional)";
     return 1;
   }
-  std::string branch1{argv[1]};
-  std::string branch2{argv[2]};
-  std::string arch = "";
-  if(argc==4) {
-    arch = argv[3];
+
+  bool human_print = false;
+  auto it = find_string(args, "--human");
+  if(it != std::end(args)) {
+    human_print = true;
+    args.erase(it);
   }
-  bool pretty_print = false;
+  std::cout<<args[0];
+  std::cout<<args[0];
+  std::string branch1{args[0]};
+  std::string branch2{args[1]};
+  std::string arch = "";
+  if(args.size()>2) {
+    std::cout<<arch<<"\n";
+    arch = args[2];
+  }
+
   auto diff = AltDiff::get_diff(branch1, branch2, arch);
   if(!diff) {
     describe_error(diff.error());
     return 1;
   }
-  if(!pretty_print) {
+  if(!human_print) {
     std::cout<<diff.value();
   } else{
     auto diff_map = AltDiff::parse_json(diff.value());
@@ -96,10 +129,6 @@ int main(int argc, char *argv[]) {
       describe_error(diff.error());
       return 1;
     }
-    for(const auto& [arch, diff] :diff_map.value()) {
-      std::cout<<"["<<arch<<"] = \n";
-      print_diff(diff);
-    }
-    return 0;
   }
+  return 0;
 }
