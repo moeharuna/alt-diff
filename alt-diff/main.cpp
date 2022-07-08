@@ -82,21 +82,24 @@ int main(int argc, char *argv[]) {
   if(argc==4) {
     arch = argv[3];
   }
-
+  bool pretty_print = false;
   auto diff = AltDiff::get_diff(branch1, branch2, arch);
   if(!diff) {
     describe_error(diff.error());
     return 1;
   }
-
-  auto diff_map = AltDiff::parse_json(diff.value());
-  if(!diff_map) {
-    describe_error(diff.error());
-    return 1;
+  if(!pretty_print) {
+    std::cout<<diff.value();
+  } else{
+    auto diff_map = AltDiff::parse_json(diff.value());
+    if(!diff_map) {
+      describe_error(diff.error());
+      return 1;
+    }
+    for(const auto& [arch, diff] :diff_map.value()) {
+      std::cout<<"["<<arch<<"] = \n";
+      print_diff(diff);
+    }
+    return 0;
   }
-  for(const auto& [arch, diff] :diff_map.value()) {
-    std::cout<<"["<<arch<<"] = \n";
-    print_diff(diff);
-  }
-  return 0;
 }
