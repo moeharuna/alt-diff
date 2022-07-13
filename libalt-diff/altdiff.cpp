@@ -7,6 +7,7 @@
 #include <future>
 #include <algorithm>
 #include <memory>
+#include <cstdlib>
 #include <boost/outcome/outcome.hpp>
 #include <boost/json/src.hpp>
 using namespace boost;
@@ -17,7 +18,7 @@ namespace AltDiff {
 
   struct Version::Impl {
     std::string version_string_;
-    std::vector<int> version_vec;
+    std::vector<std::variant<std::string, int>> version_vec;
     std::vector<std::string> str_split(std::string str, std::string delim=" ") {
       std::vector<std::string> result{};
       size_t pos = 0;
@@ -34,12 +35,14 @@ namespace AltDiff {
       std::vector<std::string> str_vec = str_split(version_string_, ".");
 
       version_vec = {};
-      try {
-        for(const auto &str:str_vec) {
-          version_vec.emplace_back(stoi(str));
+
+      for (const auto &str : str_vec) {
+        int try_int = atoi(str.c_str());
+        if(try_int!=0)
+          version_vec.emplace_back(try_int);
+        else {
+          version_vec.emplace_back(str);
         }
-      } catch(const std::invalid_argument&) {
-        version_vec = {};
       }
     }
   };
@@ -68,22 +71,21 @@ namespace AltDiff {
     return pImpl->version_string_;
   }
 
-  bool Version::operator<(const Version &b) const {
-    if(pImpl-> version_vec.size() > 0 && b.pImpl->version_vec.size() >0) {
-      for(size_t i=0; i< pImpl->version_vec.size(); ++i) {
-        if(i >= b.pImpl->version_vec.size()) {
-          return false;
-        }
-        if(pImpl->version_vec[i] < b.pImpl->version_vec[i]) {
-          return true;
-        } else if(pImpl->version_vec[i] > b.pImpl->version_vec[i]){
-          return false;
-        }
+  bool Version::operator<(const Version &rhs) const {
+    for(size_t i=0; i< pImpl->version_vec.size(); ++i) {
+      if(i >= rhs.pImpl->version_vec.size()) {
+        return false;
+      }
+      if(pImpl->version_vec[i].index() != rhs.pImpl->version_vec[i].index()) {
+        return pImpl->version_string_ < rhs.version_string();
+      }
+      if(pImpl->version_vec[i] < rhs.pImpl->version_vec[i]) {
+        return true;
+      } else if(pImpl->version_vec[i] > rhs.pImpl->version_vec[i]){
+        return false;
       }
     }
-    //Fallback if version parsing is failed
-    return pImpl->version_string_ < b.pImpl->version_string_;
-
+    return pImpl->version_string_ < rhs.version_string();
   }
 
   bool Version::operator!=(const Version &other) const{
