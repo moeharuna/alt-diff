@@ -12,7 +12,7 @@ void print_package(const AltDiff::Package& package) {
 void print_ver_missmatch(const AltDiff::VersionMissmatch & vm, size_t left_fill=0) {
   std::cout<<std::left<<std::setw(left_fill);
   std::cout<<vm.name()+": ";
-  std::cout<<vm.left().version_string()<<" < "<<vm.right().version_string()<<"\n";
+  std::cout<<vm.left().version_string()<<" > "<<vm.right().version_string()<<"\n";
 }
 
 void print_diff(const AltDiff::Diff &diff) {

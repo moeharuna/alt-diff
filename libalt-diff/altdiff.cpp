@@ -88,6 +88,23 @@ namespace AltDiff {
     return false;
   }
 
+  bool Version::operator>(const Version &rhs) const {
+    for(size_t i=0; i< pImpl->version_vec.size(); ++i) {
+      if(i >= rhs.pImpl->version_vec.size()) {
+        return true;
+      }
+      if(pImpl->version_vec[i].index() != rhs.pImpl->version_vec[i].index()) {
+        return pImpl->version_string_ > rhs.version_string();
+      }
+      if(pImpl->version_vec[i] > rhs.pImpl->version_vec[i]) {
+        return true;
+      } else if(pImpl->version_vec[i] < rhs.pImpl->version_vec[i]){
+        return false;
+      }
+    }
+    return false;
+  }
+
   bool Version::operator!=(const Version &other) const{
     return version_string()!=other.version_string();
   }
@@ -229,7 +246,7 @@ namespace AltDiff {
       bool ver_check =
         first_iter->name()    == second_iter->name() &&
         first_iter->arch()    == second_iter->arch() &&
-        first_iter->version() <  second_iter->version();
+        first_iter->version() >  second_iter->version();
      if(ver_check) {
        result.push_back(VersionMissmatch(*first_iter, *second_iter));
        ++second_iter;
