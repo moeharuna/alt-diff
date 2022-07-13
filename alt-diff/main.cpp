@@ -100,10 +100,10 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  bool human_print = false;
+  bool human_flag = false;
   auto it = find_string(args, "--human");
   if(it != std::end(args)) {
-    human_print = true;
+    human_flag = true;
     args.erase(it);
   }
   std::string branch1{args[0]};
@@ -119,7 +119,7 @@ int main(int argc, char *argv[]) {
     describe_error(diff.error());
     return 1;
   }
-  if(!human_print) {
+  if(!human_flag) {
     std::cout<<diff.value();
   } else{
     auto diff_map = AltDiff::parse_json(diff.value());
@@ -127,6 +127,7 @@ int main(int argc, char *argv[]) {
       describe_error(diff.error());
       return 1;
     }
+    human_print(diff_map.value());
   }
   return 0;
 }
