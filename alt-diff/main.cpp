@@ -106,8 +106,6 @@ int main(int argc, char *argv[]) {
     human_print = true;
     args.erase(it);
   }
-  std::cout<<args[0];
-  std::cout<<args[0];
   std::string branch1{args[0]};
   std::string branch2{args[1]};
   std::string arch = "";
