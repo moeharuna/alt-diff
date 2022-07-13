@@ -85,7 +85,7 @@ namespace AltDiff {
         return false;
       }
     }
-    return pImpl->version_string_ < rhs.version_string();
+    return false;
   }
 
   bool Version::operator!=(const Version &other) const{
@@ -227,9 +227,9 @@ namespace AltDiff {
 
     while(first_iter!=first.end() && second_iter!=second.end()) {
       bool ver_check =
-        second_iter->name()    == first_iter->name() &&
-        second_iter->arch()    == first_iter->arch() &&
-        second_iter->version() != first_iter->version();
+        first_iter->name()    == second_iter->name() &&
+        first_iter->arch()    == second_iter->arch() &&
+        first_iter->version() <  second_iter->version();
      if(ver_check) {
        result.push_back(VersionMissmatch(*first_iter, *second_iter));
        ++second_iter;

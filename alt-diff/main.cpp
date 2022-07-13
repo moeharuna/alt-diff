@@ -43,9 +43,7 @@ void print_diff(const AltDiff::Diff &diff) {
     max_len = std::max(ver_miss.name().length(), max_len);
   }
   for(const auto& ver_miss : diff.version_diff()) {
-    if(ver_miss.left() < ver_miss.right()) {
-      print_ver_missmatch(ver_miss, max_len);
-    }
+    print_ver_missmatch(ver_miss, max_len);
   }
 }
 
