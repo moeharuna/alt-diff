@@ -94,7 +94,12 @@ int main(int argc, char *argv[]) {
   if(args.size() < 2 || args.size() > 4
      || (find_string(args, "--help") != std::end(args))
      || (find_string(args, "-h"))    != std::end(args)) {
-    std::cout<<"Usage: "<<argv[0]<<" <branch1> <branch2> <arch>(optional)";
+    std::cout<<"Description:\n";
+    std::cout<<"Print diffrence between two branches of AltLinux distributive in json\n";
+    std::cout<<"Usage: "<<argv[0]<<" [flags] branch1 branch2 <arch>\n";
+    std::cout<<"  where flags are:\n";
+    std::cout<<"  --help\n";
+    std::cout<<"  --human - print in human readable form";
     return 1;
   }
 
