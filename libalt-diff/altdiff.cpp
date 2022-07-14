@@ -183,7 +183,6 @@ namespace AltDiff {
     assert(left.arch()==right.arch());
 
     pImpl = std::make_unique<Impl>();
-
     pImpl->name_ = left.name();
     pImpl->arch_ = left.arch();
     pImpl->left_ver_ = left.version();
@@ -237,16 +236,23 @@ namespace AltDiff {
     return vm;
   }
 
-  std::vector<VersionMissmatch> version_set_diffrence(const Packages &first, const Packages &second) {
+  std::vector<VersionMissmatch> version_set_diffrence(const Packages &first, const Packages &second,const MissmatchType& mt) {
     std::vector<VersionMissmatch> result{};
     auto first_iter = first.begin();
     auto second_iter = second.begin();
 
+    std::function<bool(const Version&, const Version&)> comp;
+    if(mt==MissmatchType::NotEqual)
+      comp = &Version::operator!=;
+    else if(mt==MissmatchType::LessThan)
+      comp = &Version::operator<;
+    else
+      comp = &Version::operator>;
     while(first_iter!=first.end() && second_iter!=second.end()) {
       bool ver_check =
         first_iter->name()    == second_iter->name() &&
         first_iter->arch()    == second_iter->arch() &&
-        first_iter->version() >  second_iter->version();
+        comp(first_iter->version(), second_iter->version());
      if(ver_check) {
        result.push_back(VersionMissmatch(*first_iter, *second_iter));
        ++second_iter;
@@ -273,7 +279,8 @@ namespace AltDiff {
   };
 
   Diff::Diff(const Packages &first,
-             const Packages &second) {
+             const Packages &second,
+             const MissmatchType& mt) {
     pImpl = std::make_unique<Impl>();
     assert(std::is_sorted(first.begin(),  first.end(), pImpl->name_comp));
     assert(std::is_sorted(second.begin(), second.end(), pImpl->name_comp));
@@ -284,7 +291,8 @@ namespace AltDiff {
     std::set_difference(second.begin(), second.end(),
                         first.begin(), first.end(),
                         std::back_inserter(pImpl->only_right_), pImpl->name_comp);
-    pImpl->version_missmatch_ = version_set_diffrence(first, second);
+    pImpl->version_missmatch_ = version_set_diffrence(first, second, mt);
+
   }
 
   Diff::Diff() {
@@ -349,6 +357,62 @@ namespace AltDiff {
      content_type{content_type} {}
   ExceptionError::ExceptionError(std::exception& except)
     :catched_exception{std::make_shared<std::exception>(except)} {}
+
+
+  struct Request::Impl {
+    std::string left;
+    std::string right;
+    Arch arch;
+    std::string endpoint;
+    MissmatchType mt;
+  };
+  Request::Request(const Request& r) {
+    pImpl = std::make_unique<Impl>(*r.pImpl);
+  }
+  Request& Request::operator=(const Request& r) {
+    pImpl = std::make_unique<Impl>(*r.pImpl);
+    return *this;
+  }
+  Request::~Request() = default;
+  Request::Request(const std::string& left,
+                   const std::string& right,
+                   const Arch &arch,
+                   const std::string &endpoint,
+                   const MissmatchType &mt):
+    pImpl{std::make_unique<Impl>()} {
+    pImpl->left =  left;
+    pImpl->right = right;
+    pImpl->arch = arch;
+    pImpl->endpoint = endpoint;
+    pImpl->mt = mt;
+  }
+  Request* Request::set_arch(const std::string& arch) {
+    pImpl->arch = arch;
+    return this;
+  }
+  Request* Request::set_endpoint(const std::string &endpoint) {
+    pImpl->endpoint = endpoint;
+    return this;
+  }
+  Request* Request::set_missmatch_type(const MissmatchType& mt) {
+    pImpl->mt = mt;
+    return this;
+  }
+  const std::string Request::get_left() const {
+    return pImpl->left;
+  }
+  const std::string Request::get_right() const {
+    return pImpl->right;
+  }
+  const Arch Request::get_arch() const {
+    return pImpl->arch;
+  }
+  const std::string Request::get_endpoint() const {
+    return pImpl->endpoint;
+  }
+  const MissmatchType Request::get_missmatch_type() const {
+    return pImpl->mt;
+  }
 
 
   outcome_v2::result<std::string, Error> curl_get(const std::string &url) {
@@ -448,12 +512,13 @@ namespace AltDiff {
 
 
   std::map<Arch, Diff> diff_by_arch(const Packages& packages1,
-                                    const Packages& packages2) {
+                                    const Packages& packages2,
+                                    const MissmatchType& mt) {
     auto pack1 = packages_by_arch(packages1);
     auto pack2 = packages_by_arch(packages2);
     std::map<Arch, Diff> result;
     for(const auto& [key, _] : pack1) {
-      result[key] = Diff(pack1.at(key), pack2.at(key));
+      result[key] = Diff(pack1.at(key), pack2.at(key), mt);
     }
     return result;
   }
@@ -468,15 +533,13 @@ namespace AltDiff {
     }
   }
 
-  outcome_v2::result<json::value, Error> get_diff(const std::string& branch1, const std::string& branch2,
-                const std::string &arch,
-                const std::string &endpoint) noexcept{
+  outcome_v2::result<json::value, Error> get_diff(const Request& r) noexcept{
     try {
-      auto pair = get_branch_async(branch1, branch2, arch, endpoint);
+      auto pair = get_branch_async(r.get_left(), r.get_right(), r.get_arch(), r.get_endpoint());
       if(!pair) {
         return pair.error();
       }
-      auto diffs = diff_by_arch(pair.value().first, pair.value().second);
+      auto diffs = diff_by_arch(pair.value().first, pair.value().second, r.get_missmatch_type());
       return json::value_from(diffs);
     } catch(std::exception& e) {
       return ExceptionError{e};

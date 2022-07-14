@@ -111,8 +111,9 @@ int main(int argc, char *argv[]) {
     std::cout<<arch<<"\n";
     arch = args[2];
   }
-
-  auto diff = AltDiff::get_diff(branch1, branch2, arch);
+  auto r = AltDiff::Request(branch1, branch2);
+  r.set_missmatch_type(AltDiff::MissmatchType::GreaterThan)->set_arch(arch);
+  auto diff = AltDiff::get_diff(r);
   if(!diff) {
     describe_error(diff.error());
     return 1;

@@ -54,6 +54,8 @@ namespace AltDiff {
     std::unique_ptr<Impl> pImpl;
   };
 
+  enum class MissmatchType {NotEqual, LessThan, GreaterThan};
+
   class VersionMissmatch {
   public:
 
@@ -80,7 +82,8 @@ namespace AltDiff {
   public:
     Diff();
     Diff(const std::vector<Package>& first,
-         const std::vector<Package>& second);
+         const std::vector<Package>& second,
+         const MissmatchType &mt);
     //I need implement explicit copy constructor, and copy assigment
     //for every class because i use unique_ptr for pImpl;
     Diff(const Diff&);
@@ -94,7 +97,7 @@ namespace AltDiff {
     friend void tag_invoke(boost::json::value_from_tag, boost::json::value& jv, Diff const&);
     friend Diff tag_invoke(boost::json::value_to_tag<Diff>, boost::json::value const& jv);
   private:
-    //I use pimpl to hide implimentation of all my classes.
+    //I use pimpl to hide implementation of all my classes.
     struct Impl;
     std::unique_ptr<Impl> pImpl;
   };
@@ -125,11 +128,32 @@ namespace AltDiff {
     std::shared_ptr<std::exception> catched_exception;
   };
 
+  class Request {
+  public:
+    Request(const Request&);
+    Request& operator=(const Request&);
+    ~Request();
+    Request(const std::string& left,
+            const std::string& right,
+            const Arch &arch="",
+            const std::string &endpoint="https://rdb.altlinux.org/api/export/branch_binary_packages/",
+            const MissmatchType &mt=MissmatchType::GreaterThan);
+    Request* set_arch(const std::string& arch);
+    Request* set_endpoint(const std::string &endpoint);
+    Request* set_missmatch_type(const MissmatchType& mt);
+    const std::string get_left() const;
+    const std::string get_right() const;
+    const Arch get_arch() const;
+    const std::string get_endpoint() const;
+    const MissmatchType get_missmatch_type()const ;
+  private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+  };
+
   using Error = std::variant<CurlError, HttpError, ExceptionError>;
   //Returns diffrence between two branches in json format
-  boost::outcome_v2::result<boost::json::value, Error> get_diff(const std::string& branch1, const std::string& branch2,
-                                               const std::string &arch="",
-                                               const std::string &endpoint="https://rdb.altlinux.org/api/export/branch_binary_packages/") noexcept;
+  boost::outcome_v2::result<boost::json::value, Error> get_diff(const Request &r) noexcept;
   //Parse json without exceptions. Use boost::json::value_from if you want exceptions instead of result.
   boost::outcome_v2::result<std::map<Arch, Diff>, Error> parse_json(boost::json::value&) noexcept;
 }
