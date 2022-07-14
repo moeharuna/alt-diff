@@ -11,7 +11,7 @@ CC = g++
 DEBUG_FLAGS = -g
 COMPILE_COMMAND = $(CC) --std=$(STD) $(CFLAGS) $(INCLUDE)
 
-all: lib default
+all: lib bin
 
 bin: lib
 	mkdir -p build
@@ -20,9 +20,9 @@ bin: lib
 lib:
 	mkdir -p build
 	$(COMPILE_COMMAND) -fPIC -shared $(LIB) $(LINK) -o build/libaltdiff.so
-default:
+debug:
 	mkdir -p build
-	$(COMPILE_COMMAND) $(LIB) $(BIN) $(LINK)  -o build/altdiff
+	$(COMPILE_COMMAND) $(LIB) $(BIN) $(LINK) -g -o build/altdiff
 
 install: bininstall
 
